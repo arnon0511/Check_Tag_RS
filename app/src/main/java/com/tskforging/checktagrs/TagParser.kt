@@ -5,7 +5,7 @@ object TagParser {
 
     /** Removes print/scanner whitespace without changing meaningful Part No. characters. */
     fun normalizePart(value: String): String = value
-        .replace(Regex("\\s+"), "")
+        .filterNot { it.isWhitespace() || Character.isSpaceChar(it) }
         .uppercase()
 
     /**
@@ -40,7 +40,7 @@ object TagParser {
             return ParseResult(true, normalizePart(fields[3]), "FG_TAG", "fg_pipe_field_4_normalized", "2.0")
         // DNTH box labels may add an "I" prefix to the Kanban Part No.
         // Example: ITG028351-5130 on BOX TAG matches TG028351-5130 on KANBAN.
-        val dnthBox = Regex("^I(TG\\d{6}-\\d{4}|TGY\\d{5}-\\d{4})$", RegexOption.IGNORE_CASE)
+        val dnthBox = Regex("^I(TG\\d{6}-[A-Z0-9]{4}|TGY\\d{5}-[A-Z0-9]{4})$", RegexOption.IGNORE_CASE)
             .matchEntire(normalizePart(raw))
         if (dnthBox != null)
             return ParseResult(true, dnthBox.groupValues[1].uppercase(), "DNTH_BOX", "dnth_i_prefix_removed", "2.1")
@@ -54,7 +54,12 @@ object TagParser {
 
         // AISIN confirmed sample contains 0 + seven digits + hyphen + five digits.
         // The leading zero is a Kanban prefix and is not part of the Part No.
-        val upperRaw = raw.uppercase()
+        val upperRaw = raw.map {
+            if (it.isWhitespace() || Character.isSpaceChar(it)) ' ' else it
+        }.joinToString("").uppercase()
+        // DISC must be parsed by field position, before other customer rules.
+        // Never fall back to searching all Part Nos. if a DISC record is malformed.
+        if (upperRaw.trimStart().startsWith("DISC")) return dnthDisc(upperRaw.trim())
         // New Aisin format: prefix 01 + a five-digit/five-digit Part No.
         val aisinShortMatches = Regex(
             "(?<!\\d)01\\s*(\\d{5}\\s*-\\s*\\d{5})(?!\\d)"
@@ -112,6 +117,30 @@ object TagParser {
             return ParseResult(true, normalizePart(snss.groupValues[1]), "KANBAN_SNSS", "snss_part_date_qty_clm", "1.0")
 
         return ParseResult(false, null, "UNKNOWN", "kanban_customer_auto", "1.0", "ยังไม่มีกติกาสำหรับ Kanban รูปแบบนี้")
+    }
+
+    /** Confirmed DISC layouts: header, customer part, optional box part, quantity,
+     * supplier C07, tag serial, optional lane, D/O, repeated customer part, 01.
+     * Field names are provisional; only the second pre-quantity part is selected
+     * for the new layout. The repeated customer part is checked independently.
+     */
+    private fun dnthDisc(raw: String): ParseResult {
+        val part = "(?:T\\s*G\\s*Y(?:\\s*\\d){5}|T\\s*G(?:\\s*\\d){6})\\s*-(?:\\s*[A-Z0-9]){4}"
+        val layout = Regex(
+            "^DISC[0-9\\s]+($part)\\s+(?:($part)\\s+)?" +
+                "(\\d{7})\\s+C07\\s+\\d+\\s+(?:T-\\d+\\s+)?" +
+                "\\d+\\s*($part)\\s+01$"
+        ).matchEntire(raw)
+            ?: return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_fields", "3.0",
+                "รูปแบบ DISC ไม่ครบหรือไม่ตรงกับแบบที่รองรับ กรุณาตรวจ RAW DATA")
+        val customer = normalizePart(layout.groupValues[1])
+        val boxPart = normalizePart(layout.groupValues[2])
+        val repeatedCustomer = normalizePart(layout.groupValues[4])
+        if (customer != repeatedCustomer)
+            return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_fields", "3.0",
+                "รหัสอ้างอิง DNTH ต้นรายการและท้ายรายการไม่ตรงกัน")
+        return ParseResult(true, boxPart.ifEmpty { customer }, "KANBAN_DNTH",
+            if (boxPart.isEmpty()) "dnth_disc_legacy_part" else "dnth_disc_box_part_before_qty", "3.0")
     }
 
     fun firstDifference(expected: String, actual: String): String {

@@ -107,4 +107,48 @@ class TagParserTest {
         assertEquals("16171-05030", TagParser.stand("|16171- 05030").partNo)
         assertEquals("16171-05030", TagParser.kanban("01 16171-05030").partNo)
     }
+    private val discSample = "DISC5060020000010101000210125104151120710725124061290515207154081550911TG028382-502C            TG028993-590A 0000040                         C07        3001660                 T-5          6082501901TG028382-502C       01"
+
+    @Test fun discSelectsBoxFieldNotFirstOrRepeatedCustomerPart() {
+        val result = TagParser.kanban(discSample)
+        assertTrue(result.success)
+        assertEquals("TG028993-590A", result.partNo)
+        assertEquals("dnth_disc_box_part_before_qty", result.ruleId)
+        assertTrue(TagParser.partsMatch(TagParser.stand("|TG028993-590 A").partNo!!, result.partNo!!))
+        assertTrue(TagParser.partsMatch(TagParser.box("|TG028993-590 A").partNo!!, result.partNo!!))
+        assertFalse(TagParser.partsMatch("TG028382-502C", result.partNo!!))
+        assertFalse(TagParser.partsMatch("TG028993-590B", result.partNo!!))
+    }
+
+    @Test fun discHandlesUnicodePaddingAndWhitespaceInsidePart() {
+        val raw = discSample.replace("TG028993-590A", "TG028993-590 A")
+            .replace(' ', '\u00a0') + "\r\n"
+        assertEquals("TG028993-590A", TagParser.kanban(raw).partNo)
+        assertTrue(TagParser.partsMatch(" TG028993-590\u00a0A\u202f", "TG028993-590A"))
+        assertEquals("TG028993-590A", TagParser.box("ITG028993-590 A").partNo)
+    }
+
+    @Test fun discRejectsConflictingReferenceEvenWhenBoxMatches() {
+        val raw = discSample.replace("6082501901TG028382-502C", "6082501901TG028382-503C")
+        assertFalse(TagParser.kanban(raw).success)
+    }
+
+    @Test fun discRejectsMissingQuantityMissingPartAndExtraCandidate() {
+        assertFalse(TagParser.kanban(discSample.replace("0000040", "")).success)
+        assertFalse(TagParser.kanban(discSample.replace("TG028993-590A", "BAD-PART")).success)
+        assertFalse(TagParser.kanban(discSample.replace("0000040", "TG028993-591A 0000040")).success)
+        assertFalse(TagParser.kanban(discSample.substringBefore("C07")).success)
+        assertFalse(TagParser.kanban(discSample.replace("TG028993-590A", "TG028993-590AA")).success)
+    }
+
+    @Test fun discAllowsBlankOptionalPartAndLaneInConfirmedStructure() {
+        val raw = discSample.replace("TG028993-590A", "").replace("T-5", "")
+        assertEquals("TG028382-502C", TagParser.kanban(raw).partNo)
+    }
+
+    @Test fun legacyDnthStillRejectsDifferentSuffixes() {
+        assertFalse(TagParser.kanban("TG028351-5130 data TG028351-5131").success)
+        assertTrue(TagParser.partsMatch("JGC123456-40", "JGC123456-31-2"))
+        assertFalse(TagParser.partsMatch("TG028382-502C", "TG028382-503C"))
+    }
 }
