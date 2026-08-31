@@ -151,4 +151,39 @@ class TagParserTest {
         assertTrue(TagParser.partsMatch("JGC123456-40", "JGC123456-31-2"))
         assertFalse(TagParser.partsMatch("TG028382-502C", "TG028382-503C"))
     }
+    @Test fun readsPlainDnthStandAndBoxWithAsciiAndUnicodeSpaces() {
+        for (raw in listOf("TG028993-590 A", " TG028993-590\u00a0A\r\n", "tg028993-590a", "TG028993-590\u202fA")) {
+            assertEquals("TG028993-590A", TagParser.stand(raw).partNo)
+            assertEquals("TG028993-590A", TagParser.box(raw).partNo)
+            assertTrue(TagParser.stand(raw).success)
+            assertTrue(TagParser.box(raw).success)
+        }
+        assertEquals("TGY94159-0010", TagParser.stand("TGY94159-0010").partNo)
+        assertEquals("TGY94159-0010", TagParser.box("TGY94159-0010").partNo)
+    }
+
+    @Test fun plainDnthWorksWithNewKanbanAndRejectsWrongPart() {
+        val stand = TagParser.stand("TG028993-590 A")
+        val box = TagParser.box("TG028993-590 A")
+        val kanban = TagParser.kanban(discSample)
+        assertTrue(TagParser.partsMatch(stand.partNo!!, box.partNo!!))
+        assertTrue(TagParser.partsMatch(box.partNo!!, kanban.partNo!!))
+        assertFalse(TagParser.partsMatch(TagParser.box("TG028993-590B").partNo!!, kanban.partNo!!))
+    }
+
+    @Test fun plainDnthDoesNotGuessFromOtherDocumentsOrMalformedValues() {
+        for (raw in listOf("", " \u00a0", "| \u00a0", "EMPLOYEE|Mr.Burin", discSample,
+            "TG028993-590A TG028993-590B", "TG028993-590AA", "TG028993-590", "PREFIX TG028993-590A")) {
+            assertFalse("Stand accepted: $raw", TagParser.stand(raw).success)
+            assertFalse("Box accepted: $raw", TagParser.box(raw).success)
+        }
+    }
+
+    @Test fun plainDnthFixPreservesExistingStandBoxFormats() {
+        assertEquals("TG028993-590A", TagParser.stand("|TG028993-590 A").partNo)
+        assertEquals("TG028993-590A", TagParser.box("|TG028993-590 A").partNo)
+        assertEquals("TG028993-590A", TagParser.box("ITG028993-590 A").partNo)
+        assertEquals("TG028993-590A", TagParser.box("PD26080101|FP01|PART|TG028993-590 A|40|PCS").partNo)
+        assertEquals("JGC123456-40", TagParser.stand("|JGC123456-40").partNo)
+    }
 }

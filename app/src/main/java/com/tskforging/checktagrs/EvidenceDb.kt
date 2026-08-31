@@ -29,7 +29,7 @@ class EvidenceDb(context: Context) : SQLiteOpenHelper(context, "check_tag_rs.db"
     }
 
     fun startSession(id: String, checkStand: Boolean, employeeName: String, employeeRaw: String) = writableDatabase.insertOrThrow("sessions", null, ContentValues().apply {
-        put("session_id", id); put("started_at", System.currentTimeMillis()); put("app_version", "0.11.0")
+        put("session_id", id); put("started_at", System.currentTimeMillis()); put("app_version", "0.15.0")
         put("stand_check_mode", if(checkStand) "CHECK" else "SKIP")
         put("employee_name", employeeName); put("employee_raw", employeeRaw)
     })

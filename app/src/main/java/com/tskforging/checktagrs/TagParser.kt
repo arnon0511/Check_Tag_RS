@@ -23,20 +23,31 @@ object TagParser {
     fun partsMatch(expected: String, actual: String): Boolean =
         comparisonPart(expected) == comparisonPart(actual)
 
+    // Accept only a complete, known DNTH Part No.; never extract a substring
+    // from a multi-field Kanban, employee QR, or arbitrary label text.
+    private fun plainDnthPart(raw: String): String? {
+        val value = normalizePart(raw)
+        return value.takeIf { Regex("^(?:TG\\d{6}|TGY\\d{5})-[A-Z0-9]{4}$").matches(it) }
+    }
+
     fun stand(rawInput: String): ParseResult {
         val raw = clean(rawInput)
         val fields = raw.split('|')
-        return if (fields.size == 2 && fields[0].isEmpty() && fields[1].isNotEmpty())
-            ParseResult(true, normalizePart(fields[1]), "STAND", "stand_pipe_field_2_normalized", "2.0")
-        else ParseResult(false, null, "UNKNOWN", "stand_pipe_field_2", "1.0", "Stand ต้องมีรูปแบบ |PART-NO")
+        if (fields.size == 2 && fields[0].isEmpty() && normalizePart(fields[1]).isNotEmpty())
+            return ParseResult(true, normalizePart(fields[1]), "STAND", "stand_pipe_field_2_normalized", "2.0")
+        plainDnthPart(raw)?.let {
+            return ParseResult(true, it, "STAND", "stand_dnth_plain_part", "1.0")
+        }
+        return ParseResult(false, null, "UNKNOWN", "stand_auto", "2.0",
+            "Stand ต้องเป็น |PART-NO หรือรหัส DNTH เช่น TG028993-590A หากยังอ่านไม่ได้ ให้เปิด RAW DATA")
     }
 
     fun box(rawInput: String): ParseResult {
         val raw = clean(rawInput)
         val fields = raw.split('|')
-        if (fields.size == 2 && fields[0].isEmpty() && fields[1].isNotEmpty())
+        if (fields.size == 2 && fields[0].isEmpty() && normalizePart(fields[1]).isNotEmpty())
             return ParseResult(true, normalizePart(fields[1]), "PLASTIC_BOX", "plastic_pipe_field_2_normalized", "2.0")
-        if (raw.startsWith("PD") && fields.size >= 4 && fields[3].isNotEmpty())
+        if (raw.startsWith("PD") && fields.size >= 4 && normalizePart(fields[3]).isNotEmpty())
             return ParseResult(true, normalizePart(fields[3]), "FG_TAG", "fg_pipe_field_4_normalized", "2.0")
         // DNTH box labels may add an "I" prefix to the Kanban Part No.
         // Example: ITG028351-5130 on BOX TAG matches TG028351-5130 on KANBAN.
@@ -44,7 +55,11 @@ object TagParser {
             .matchEntire(normalizePart(raw))
         if (dnthBox != null)
             return ParseResult(true, dnthBox.groupValues[1].uppercase(), "DNTH_BOX", "dnth_i_prefix_removed", "2.1")
-        return ParseResult(false, null, "UNKNOWN", "box_auto", "1.0", "ไม่รู้จักรูปแบบ Box Tag")
+        plainDnthPart(raw)?.let {
+            return ParseResult(true, it, "DNTH_BOX", "box_dnth_plain_part", "1.0")
+        }
+        return ParseResult(false, null, "UNKNOWN", "box_auto", "1.1",
+            "ไม่รู้จักรูปแบบ Box Tag รองรับ |PART-NO, FG Tag, รหัส DNTH และ I+รหัส DNTH กรุณาเปิด RAW DATA")
     }
 
     fun kanban(rawInput: String): ParseResult {

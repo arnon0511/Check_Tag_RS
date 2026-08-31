@@ -1,0 +1,24 @@
+PASS no empty batch or early phase completion
+PASS three Kanbans first then three Boxes; explicit completion
+PASS wrong Kanban is not counted and blocks phase change
+PASS invalid parser result blocks advance and does not count
+PASS unmatched Box does not consume a Kanban
+PASS one Kanban cannot approve multiple Boxes
+PASS missing Boxes prevent completion
+PASS skip Stand matches mixed parts in any Box order
+PASS remove last Kanban before locking count
+PASS removing only Kanban cannot finish phase
+PASS removing Box releases its exact Kanban
+PASS clear button does not dismiss rejected scan
+PASS recover from excess scan by clear and rescan
+PASS completed batch is immutable
+PASS new batch carries no previous references
+PASS customer comparison callback is applied to Stand Kanban and Box
+PASS same part multiple labels are separate pairs
+PASS collection getters cannot edit counts
+Passed 18 production-flow scenarios
+
+XML: 4 files parsed; 18 UI IDs resolved.
+Original parser and employee logic preserved byte-for-byte from v0.14.
+NOT RUN: Kotlin/Android compilation, full JUnit suite, APK build, PM75 device test.
+Reason: Android/Kotlin/Gradle toolchain unavailable; tool download timed out.

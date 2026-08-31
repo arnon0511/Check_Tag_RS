@@ -31,10 +31,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var difference: TextView
     private lateinit var rawButton: Button
     private lateinit var boxDoneButton: Button
+    private lateinit var kanbanDoneButton: Button
     private lateinit var rescanButton: Button
     private lateinit var nextButton: Button
     private lateinit var clearButton: Button
-    private var target = ScanTarget.STAND
+    private var flow = MultiKanbanFlow(true, TagParser::partsMatch)
+    private val target get() = ScanTarget.valueOf(flow.target.name)
     private var sessionId = ""
     private var sequence = 0
     private var retryCount = 0
@@ -43,8 +45,8 @@ class MainActivity : AppCompatActivity() {
     private var cycleComplete = false
     private var employeeName = ""
     private var employeeRaw = ""
-    private var standPart: String? = null
-    private val boxes = mutableListOf<BatchBox>()
+    private val standPart get() = flow.standPart
+    private val boxes get() = flow.boxes
     private val rawEvents = mutableListOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,10 +56,12 @@ class MainActivity : AppCompatActivity() {
         employeeView=findViewById(R.id.employeeName); standView=findViewById(R.id.standPart); boxView=findViewById(R.id.boxPart)
         kanbanView=findViewById(R.id.kanbanPart); difference=findViewById(R.id.difference)
         rawButton=findViewById(R.id.rawButton); boxDoneButton=findViewById(R.id.boxDoneButton)
+        kanbanDoneButton=findViewById(R.id.kanbanDoneButton)
         rescanButton=findViewById(R.id.rescanButton); nextButton=findViewById(R.id.nextButton); clearButton=findViewById(R.id.clearButton)
         input.setOnEditorActionListener { _,_,_ -> consumeScan(); true }
         input.setOnKeyListener { _,key,event -> if(key==66 && event.action==1){ consumeScan(); true } else false }
         rawButton.setOnClickListener { showRaw() }; boxDoneButton.setOnClickListener { finishBoxes() }
+        kanbanDoneButton.setOnClickListener { finishKanbans() }
         rescanButton.setOnClickListener { resetScanMessage() }; nextButton.setOnClickListener { beginEmployeeScan() }
         clearButton.setOnClickListener { confirmClearLast() }
         findViewById<Button>(R.id.historyButton).setOnClickListener { showHistory() }
@@ -74,16 +78,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun prepareNewCycle(){
-        sessionId=""; employeeName=""; employeeRaw=""; awaitingEmployee=true; standPart=null
+        sessionId=""; employeeName=""; employeeRaw=""; awaitingEmployee=true; flow=MultiKanbanFlow(true, TagParser::partsMatch)
         cycleComplete=false
-        boxes.clear(); rawEvents.clear(); sequence=0; retryCount=0
+        rawEvents.clear(); sequence=0; retryCount=0
     }
 
     private fun showEmployeePrompt(){
         whitePanel(); status.text="รอสแกนพนักงาน"; stepView.text="SCAN EMPLOYEE"
         instruction.text="สแกน QR พนักงานก่อนเริ่มตรวจ Tag"; employeeView.text="ผู้ตรวจ: —"
-        standView.text="STAND\n—"; boxView.text="BOX TAG\n0 ใบ"; kanbanView.text="KANBAN\n0 / 0 ใบ"; difference.text=""
-        rawButton.visibility=View.GONE; boxDoneButton.visibility=View.GONE; rescanButton.visibility=View.GONE; nextButton.visibility=View.GONE
+        standView.text="STAND\n—"; boxView.text="BOX TAG\n0 ใบ"; kanbanView.text="KANBAN\n0 ใบ"; difference.text=""
+        rawButton.visibility=View.GONE; kanbanDoneButton.visibility=View.GONE; boxDoneButton.visibility=View.GONE; rescanButton.visibility=View.GONE; nextButton.visibility=View.GONE; clearButton.visibility=View.GONE
         focusScanner()
     }
 
@@ -93,7 +97,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun beginSession(withStand:Boolean){
         checkStand=withStand; sessionId=UUID.randomUUID().toString(); db.startSession(sessionId,checkStand,employeeName,employeeRaw)
-        target=if(checkStand) ScanTarget.STAND else ScanTarget.BOX_TAG; whitePanel(); status.text="รอการสแกน"
+        flow=MultiKanbanFlow(checkStand, TagParser::partsMatch); whitePanel(); status.text="รอการสแกน"
+        nextButton.visibility=View.GONE; rescanButton.visibility=View.GONE; rawButton.visibility=View.GONE; difference.text=""
         employeeView.text="ผู้ตรวจ: $employeeName"; standView.text=if(checkStand)"STAND\n—" else "STAND\nข้ามการตรวจ"
         updateCounters(); updateStep(); focusScanner()
     }
@@ -107,96 +112,123 @@ class MainActivity : AppCompatActivity() {
             employeeRaw=employee.raw; employeeName=employee.name; awaitingEmployee=false
             employeeView.text="ผู้ตรวจ: $employeeName ✓"; employeeView.setTextColor(Color.rgb(6,118,71)); chooseStandMode(); return
         }
+        if(sessionId.isEmpty()) return
         val parsed=when(target){ ScanTarget.STAND->TagParser.stand(scanned); ScanTarget.BOX_TAG->TagParser.box(scanned); ScanTarget.KANBAN->TagParser.kanban(scanned) }
         sequence++; val eventId=UUID.randomUUID().toString()
-        val compare=when {
-            !parsed.success -> "NOT_COMPARED"
-            target==ScanTarget.STAND -> "REFERENCE"
-            target==ScanTarget.BOX_TAG && checkStand -> if(TagParser.partsMatch(standPart!!,parsed.partNo!!))"MATCH" else "MISMATCH"
-            target==ScanTarget.BOX_TAG -> "REFERENCE"
-            BatchMatcher.findFirstUnmatched(boxes,parsed.partNo!!)>=0 -> "MATCH"
-            else -> "MISMATCH"
-        }
+        val compare=flow.comparison(if(parsed.success) parsed.partNo else null)
         db.saveEvent(ScanEvidence(eventId,sessionId,sequence,System.currentTimeMillis(),target,scanned,sha256(scanned),parsed.tagType,parsed.partNo,parsed.ruleId,parsed.ruleVersion,if(parsed.success)"SUCCESS" else "INVALID",compare,null))
-        if(!parsed.success || (target==ScanTarget.KANBAN && compare=="MISMATCH")) retryCount++
+        if(compare !in setOf("REFERENCE", "MATCH")) retryCount++
         rawEvents += "#$sequence ${target.name}\n$scanned"
-        if(!parsed.success){ showError("อ่านไม่ได้",parsed.message); return }
-        when(target){
-            ScanTarget.STAND -> { standPart=parsed.partNo; standView.text="STAND\n${parsed.partNo}\nREFERENCE"; standView.setTextColor(Color.rgb(6,118,71)); target=ScanTarget.BOX_TAG; updateStep() }
-            ScanTarget.BOX_TAG -> addBox(parsed.partNo!!)
-            ScanTarget.KANBAN -> addKanban(parsed.partNo!!)
+        val scannedTarget=target
+        if(!flow.accept(if(parsed.success) parsed.partNo else null)){
+            boxDoneButton.visibility=View.GONE; kanbanDoneButton.visibility=View.GONE
+            if(!parsed.success || parsed.partNo==null) showError("อ่านไม่ได้",parsed.message)
+            else {
+                val reference=flow.referencePart
+                val detail=if(reference!=null) "\nอ้างอิงที่ยังไม่จับคู่: $reference\n${TagParser.firstDifference(reference,parsed.partNo!!)}" else ""
+                showError(if(scannedTarget==ScanTarget.KANBAN) "KANBAN ไม่ตรง STAND" else "BOX ไม่มี KANBAN ที่จับคู่ได้",
+                    "อ่านได้: ${parsed.partNo}$detail\nไม่นับรายการนี้ กรุณาสแกนใบที่ถูกต้องใหม่" +
+                    if(scannedTarget==ScanTarget.BOX_TAG && flow.remaining==0) "\nถ้าสแกนเกินหลังครบแล้ว ให้ล้าง BOX ล่าสุดและสแกนกล่องนั้นใหม่" else "")
+            }
+            return
         }
-        focusScanner()
+        whitePanel(); rescanButton.visibility=View.GONE; rawButton.visibility=View.VISIBLE
+        status.text=when(scannedTarget){
+            ScanTarget.STAND -> "รับ STAND แล้ว — สแกน KANBAN ให้ครบทุกใบ"
+            ScanTarget.KANBAN -> "รับ KANBAN #${flow.kanbans.size} แล้ว — ยิงต่อหรือกด KANBAN ครบ"
+            ScanTarget.BOX_TAG -> "BOX #${boxes.size} ตรงกัน"
+        }
+        status.setTextColor(Color.rgb(6,118,71))
+        difference.text=if(scannedTarget==ScanTarget.BOX_TAG) "BOX #${boxes.size}: ${parsed.partNo} ↔ KANBAN #${boxes.last().kanbanScanNo}" else ""
+        updateCounters(); updateStep(); focusScanner()
     }
 
-    private fun addBox(part:String){
-        boxes += BatchBox(boxes.size+1,part)
-        val matchesStand=!checkStand || TagParser.partsMatch(standPart!!,part)
-        status.text=if(matchesStand)"รับ BOX แล้ว" else "BOX ไม่ตรง STAND"
-        status.setTextColor(if(matchesStand)Color.rgb(6,118,71) else Color.rgb(180,35,24))
-        difference.text=if(matchesStand)"BOX #${boxes.size}: $part" else "BOX #${boxes.size}: ${TagParser.firstDifference(standPart!!,part)}"
-        boxDoneButton.visibility=View.VISIBLE; rawButton.visibility=View.VISIBLE; updateCounters(); updateStep()
+    private fun finishKanbans(){
+        if(awaitingEmployee || sessionId.isEmpty()) return
+        if(!flow.finishKanbans()){
+            Toast.makeText(this,"ต้องมี KANBAN อย่างน้อย 1 ใบ และแก้รายการที่ผิดให้ถูกต้องก่อน",Toast.LENGTH_SHORT).show()
+            return
+        }
+        recordAction("KANBAN_COMPLETE", ScanTarget.KANBAN)
+        whitePanel(); status.text="KANBAN ครบ ${flow.kanbans.size} ใบ — เริ่มสแกน BOX"
+        difference.text="BOX 1 กล่อง ต่อ KANBAN 1 ใบ"; updateCounters(); updateStep(); focusScanner()
     }
 
     private fun finishBoxes(){
-        if(boxes.isEmpty()){ Toast.makeText(this,"ต้องสแกน BOX อย่างน้อย 1 ใบ",Toast.LENGTH_SHORT).show(); return }
-        target=ScanTarget.KANBAN; boxDoneButton.visibility=View.GONE; status.text="รอสแกน KANBAN"; status.setTextColor(Color.rgb(52,64,84)); difference.text=""
-        updateStep(); focusScanner()
-    }
-
-    private fun addKanban(part:String){
-        val index=BatchMatcher.findFirstUnmatched(boxes,part)
-        if(index<0){ showError("KANBAN ไม่พบ BOX ที่ตรงกัน","Part No. $part\nกรุณาตรวจและสแกน KANBAN ใบที่ถูกต้อง"); return }
-        boxes[index].kanbanPart=part
-        val done=boxes.count{it.kanbanPart!=null}; status.text="จับคู่สำเร็จ BOX #${index+1}"
-        status.setTextColor(Color.rgb(6,118,71)); difference.text="KANBAN $done / ${boxes.size}: $part"; updateCounters()
-        if(BatchMatcher.isComplete(boxes)) showFinal() else updateStep()
+        if(awaitingEmployee || sessionId.isEmpty()) return
+        if(!flow.finish()){
+            Toast.makeText(this,if(flow.scanError) "กรุณาสแกนรายการที่ผิดให้ถูกต้องก่อน" else "ต้องจับคู่ BOX กับ KANBAN ให้ครบทุกใบ (เหลือ ${flow.remaining} ใบ)",Toast.LENGTH_SHORT).show()
+            return
+        }
+        showFinal()
     }
 
     private fun updateCounters(){
-        val standBad=boxes.count{checkStand && !TagParser.partsMatch(standPart!!,it.partNo)}
-        boxView.text="BOX TAG\n${boxes.size} ใบ" + if(standBad>0)"  (ไม่ตรง STAND $standBad)" else ""
-        kanbanView.text="KANBAN\n${boxes.count{it.kanbanPart!=null}} / ${boxes.size} ใบ"
-        boxView.setTextColor(if(standBad>0)Color.rgb(180,35,24) else Color.rgb(6,118,71))
-        kanbanView.setTextColor(Color.rgb(6,118,71))
+        standView.text=if(checkStand) "STAND\n${standPart ?: "—"}" else "STAND\nข้ามการตรวจ"
+        boxView.text="BOX TAG\n${boxes.size} กล่องผ่าน"
+        kanbanView.text="KANBAN\n${flow.kanbans.size} ใบ • จับคู่ ${boxes.size} • เหลือ ${flow.remaining}" +
+            (flow.kanbans.lastOrNull()?.let { "\nล่าสุด: ${it.partNo}" } ?: "")
+        boxView.setTextColor(Color.rgb(6,118,71)); kanbanView.setTextColor(Color.rgb(6,118,71))
     }
 
     private fun showFinal(){
-        val ok=boxes.all{!checkStand || TagParser.partsMatch(standPart!!,it.partNo)} && BatchMatcher.isComplete(boxes)
-        status.text=if(ok)"OK" else "NG"; status.setTextColor(Color.WHITE); panel.setBackgroundColor(if(ok)Color.rgb(3,152,85) else Color.rgb(217,45,32))
+        status.text="OK"; status.setTextColor(Color.WHITE); panel.setBackgroundColor(Color.rgb(3,152,85))
         listOf(employeeView,standView,boxView,kanbanView,difference).forEach{it.setTextColor(Color.WHITE)}
-        difference.text=if(ok)"จับคู่ BOX และ KANBAN ครบ ${boxes.size} ใบ" else "มี BOX ที่ Part No. ไม่ตรงกับ STAND"
-        val parts=mapOfNotNull(ScanTarget.STAND to standPart, ScanTarget.BOX_TAG to boxes.joinToString(" | "){it.partNo}, ScanTarget.KANBAN to boxes.joinToString(" | "){it.kanbanPart ?: "—"})
-        db.finishSession(sessionId,if(ok)"OK" else "NG",retryCount,parts)
+        difference.text="ตรวจผ่าน ${boxes.size} คู่ • BOX ${boxes.size} กล่อง / KANBAN ${flow.kanbans.size} ใบ"
+        val parts=mapOfNotNull(ScanTarget.STAND to standPart, ScanTarget.BOX_TAG to boxes.joinToString(" | "){it.partNo}, ScanTarget.KANBAN to flow.kanbans.joinToString(" | "){"#${it.scanNo} ${it.partNo} ↔ BOX #${it.boxScanNo}"})
+        db.finishSession(sessionId,"OK",retryCount,parts)
         sessionId=""; awaitingEmployee=true; cycleComplete=true
-        stepView.text="COMPARE RESULT"; instruction.text=(if(ok)"ตรวจสอบผ่าน" else "ตรวจพบข้อมูลไม่ตรงกัน") + " • สแกน QR พนักงานเพื่อเริ่มรอบใหม่"
-        rawButton.visibility=View.VISIBLE; rescanButton.visibility=View.GONE; nextButton.visibility=View.VISIBLE; clearButton.visibility=View.GONE
+        stepView.text="COMPARE RESULT"; instruction.text="ตรวจสอบผ่าน • สแกน QR พนักงานเพื่อเริ่มรอบใหม่"
+        rawButton.visibility=View.VISIBLE; kanbanDoneButton.visibility=View.GONE; boxDoneButton.visibility=View.GONE; rescanButton.visibility=View.GONE; nextButton.visibility=View.VISIBLE; clearButton.visibility=View.GONE
     }
 
     private fun mapOfNotNull(vararg pairs:Pair<ScanTarget,String?>):Map<ScanTarget,String> = pairs.mapNotNull{(k,v)->v?.let{k to it}}.toMap()
 
     private fun showError(title:String,msg:String){ status.text=title; status.setTextColor(Color.WHITE); panel.setBackgroundColor(Color.rgb(217,45,32)); difference.text=msg; difference.setTextColor(Color.WHITE); rescanButton.visibility=View.VISIBLE; rawButton.visibility=View.VISIBLE; focusScanner() }
-    private fun resetScanMessage(){ whitePanel(); status.text="รอสแกนใหม่"; difference.text=""; rescanButton.visibility=View.GONE; updateCounters(); updateStep(); focusScanner() }
+    private fun resetScanMessage(){
+        if(awaitingEmployee){showEmployeePrompt();return}
+        if(flow.scanError){instruction.text="สแกนรายการที่ผิดใหม่ให้ถูกต้อง จึงจะทำต่อได้";focusScanner();return}
+        whitePanel(); status.text="รอสแกนใหม่"; difference.text=""; rescanButton.visibility=View.GONE
+        updateCounters(); updateStep(); focusScanner()
+    }
 
     private fun confirmClearLast(){
-        if(boxes.isEmpty()) return
-        val label=if(target==ScanTarget.KANBAN && boxes.any{it.kanbanPart!=null})"KANBAN ที่จับคู่ล่าสุด" else "BOX ล่าสุด"
-        AlertDialog.Builder(this).setTitle("ล้าง $label?").setMessage("หลักฐานการสแกนเดิมยังอยู่ในประวัติ RAW DATA")
+        if(awaitingEmployee) return
+        val isKanban=target==ScanTarget.KANBAN
+        if(if(isKanban) flow.kanbans.isEmpty() else boxes.isEmpty()) return
+        val label=if(isKanban) "KANBAN" else "BOX"
+        AlertDialog.Builder(this).setTitle("ล้าง $label ล่าสุด?")
+            .setMessage(if(isKanban) "ลดจำนวน KANBAN 1 ใบ โดยยังเก็บ RAW DATA" else "ลดจำนวน BOX 1 กล่อง และคืน KANBAN ที่จับคู่ไว้ให้สแกน BOX ใหม่ โดยยังเก็บ RAW DATA")
             .setNegativeButton("ยกเลิก",null).setPositiveButton("ล้าง"){_,_->clearLast()}.show()
     }
 
     private fun clearLast(){
-        if(target==ScanTarget.KANBAN){ boxes.indexOfLast{it.kanbanPart!=null}.takeIf{it>=0}?.let{boxes[it].kanbanPart=null} }
-        else if(boxes.isNotEmpty()) boxes.removeAt(boxes.lastIndex)
-        whitePanel(); status.text="ล้างแล้ว — รอสแกน"; difference.text=""; updateCounters(); updateStep(); focusScanner()
+        val removedTarget=target
+        val removedPart=if(target==ScanTarget.KANBAN) flow.kanbans.lastOrNull()?.partNo else boxes.lastOrNull()?.partNo
+        if(!flow.removeLast()) return
+        recordAction("REMOVE_LAST", removedTarget, removedPart)
+        if(!flow.scanError){whitePanel();status.text="ล้างรายการล่าสุดแล้ว";difference.text=""}
+        updateCounters(); updateStep(); focusScanner()
+    }
+
+    private fun recordAction(action:String, actionTarget:ScanTarget, part:String?=null){
+        sequence++
+        val raw="USER_ACTION|$action|${actionTarget.name}|${part ?: ""}"
+        db.saveEvent(ScanEvidence(UUID.randomUUID().toString(),sessionId,sequence,System.currentTimeMillis(),actionTarget,raw,sha256(raw),"USER_ACTION",part,"batch_operator_action","1.0","ACTION",action,null))
+        rawEvents += "#$sequence $raw"
     }
 
     private fun updateStep(){
+        kanbanDoneButton.visibility=if(target==ScanTarget.KANBAN && flow.kanbans.isNotEmpty() && !flow.scanError) View.VISIBLE else View.GONE
+        boxDoneButton.visibility=if(flow.canFinish()) View.VISIBLE else View.GONE
+        clearButton.visibility=if((target==ScanTarget.KANBAN && flow.kanbans.isNotEmpty()) || (target==ScanTarget.BOX_TAG && boxes.isNotEmpty())) View.VISIBLE else View.GONE
+        clearButton.text=if(target==ScanTarget.KANBAN) "ล้าง KANBAN ล่าสุด" else "ล้าง BOX ล่าสุด"
         when(target){
             ScanTarget.STAND->{stepView.text="SCAN STAND";instruction.text="สแกน STAND 1 ใบ"}
-            ScanTarget.BOX_TAG->{stepView.text="SCAN BOX TAG • ${boxes.size} ใบ";instruction.text="สแกน BOX ต่อเนื่อง แล้วกด BOX ครบ"}
-            ScanTarget.KANBAN->{val done=boxes.count{it.kanbanPart!=null};stepView.text="SCAN KANBAN • $done / ${boxes.size}";instruction.text="สแกน KANBAN ตามจำนวน BOX ระบบจับคู่ Part No. อัตโนมัติ"}
+            ScanTarget.KANBAN->{stepView.text="SCAN KANBAN • ${flow.kanbans.size} ใบ";instruction.text="สแกน KANBAN ทุกใบ แล้วกด KANBAN ครบ ก่อนเริ่ม BOX"}
+            ScanTarget.BOX_TAG->{stepView.text="SCAN BOX TAG • ${boxes.size}/${flow.kanbans.size} กล่อง";instruction.text=if(flow.remaining==0) "จับคู่ครบแล้ว กด BOX ครบ เพื่อจบชุด" else "สแกน BOX จับคู่ 1:1 • ยังเหลือ ${flow.remaining} ใบ"}
         }
+        if(flow.scanError) instruction.text="สแกนรายการที่ผิดใหม่ให้ถูกต้องก่อนทำต่อ"
     }
 
     private fun showRaw()=AlertDialog.Builder(this).setTitle("RAW DATA เต็ม").setMessage(rawEvents.joinToString("\n\n").ifBlank{"—"}).setPositiveButton("ปิด",null).show()
