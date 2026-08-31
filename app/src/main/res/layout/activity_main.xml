@@ -5,13 +5,18 @@
     android:orientation="vertical" android:padding="18dp" android:background="#F8FAFC">
 
     <TextView android:id="@+id/title" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="CHECK TAG_RS v0.15.0" android:textStyle="bold" android:textSize="28sp" android:textColor="#101828" />
+        android:text="CHECK TAG_RS v0.16.0" android:textStyle="bold" android:textSize="28sp" android:textColor="#101828" />
     <TextView android:id="@+id/step" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginTop="10dp" android:text="SCAN EMPLOYEE" android:textStyle="bold"
         android:textSize="24sp" android:textColor="#155EEF" />
     <TextView android:id="@+id/instruction" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginTop="8dp" android:text="สแกน QR พนักงานก่อนเริ่มตรวจ"
         android:textSize="18sp" android:textColor="#344054" />
+
+    <Button android:id="@+id/clearButton" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:minHeight="52dp" android:layout_marginTop="8dp" android:text="ล้างรายการล่าสุด" android:textSize="17sp" />
+    <Button android:id="@+id/resetBatchButton" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:minHeight="52dp" android:layout_marginTop="4dp" android:text="ล้างชุดปัจจุบัน / เริ่มใหม่" android:textSize="17sp" />
 
     <EditText android:id="@+id/scannerInput" android:layout_width="1dp" android:layout_height="1dp"
         android:singleLine="true" android:imeOptions="actionDone" android:inputType="textNoSuggestions"
@@ -35,16 +40,12 @@
 
     <Button android:id="@+id/rawButton" android:layout_width="match_parent" android:layout_height="56dp"
         android:text="ดู RAW DATA เต็ม" android:textSize="17sp" android:visibility="gone" />
-    <Button android:id="@+id/kanbanDoneButton" android:layout_width="match_parent" android:layout_height="60dp"
-        android:layout_marginTop="8dp" android:text="KANBAN ครบ / เริ่มสแกน BOX" android:textSize="18sp" android:visibility="gone" />
     <Button android:id="@+id/boxDoneButton" android:layout_width="match_parent" android:layout_height="60dp"
         android:layout_marginTop="8dp" android:text="BOX ครบ / จบชุด" android:textSize="18sp" android:visibility="gone" />
     <Button android:id="@+id/rescanButton" android:layout_width="match_parent" android:layout_height="56dp"
         android:layout_marginTop="8dp" android:text="สแกนรายการนี้ใหม่" android:textSize="17sp" android:visibility="gone" />
     <Button android:id="@+id/nextButton" android:layout_width="match_parent" android:layout_height="60dp"
         android:layout_marginTop="8dp" android:text="เริ่มรอบใหม่ / รอสแกนพนักงาน" android:textSize="18sp" android:visibility="gone" />
-    <Button android:id="@+id/clearButton" android:layout_width="match_parent" android:layout_height="52dp"
-        android:layout_marginTop="8dp" android:text="CLEAR LAST / ล้างรายการล่าสุด" android:textSize="16sp" />
     <Button android:id="@+id/historyButton" android:layout_width="match_parent" android:layout_height="52dp"
         android:layout_marginTop="8dp" android:text="ประวัติ → เลือกรายการ → ดูรายละเอียด" android:textSize="15sp" />
     <Button android:id="@+id/exportButton" android:layout_width="match_parent" android:layout_height="52dp"

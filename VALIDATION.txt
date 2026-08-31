@@ -1,24 +1,23 @@
-PASS no empty batch or early phase completion
-PASS three Kanbans first then three Boxes; explicit completion
-PASS wrong Kanban is not counted and blocks phase change
-PASS invalid parser result blocks advance and does not count
-PASS unmatched Box does not consume a Kanban
-PASS one Kanban cannot approve multiple Boxes
-PASS missing Boxes prevent completion
-PASS skip Stand matches mixed parts in any Box order
-PASS remove last Kanban before locking count
-PASS removing only Kanban cannot finish phase
-PASS removing Box releases its exact Kanban
-PASS clear button does not dismiss rejected scan
-PASS recover from excess scan by clear and rescan
-PASS completed batch is immutable
-PASS new batch carries no previous references
-PASS customer comparison callback is applied to Stand Kanban and Box
-PASS same part multiple labels are separate pairs
-PASS collection getters cannot edit counts
-Passed 18 production-flow scenarios
+PASS Stand then one Kanban immediately enters Box
+PASS one Kanban checks many Boxes without requesting more Kanbans
+PASS one Box can finish only with explicit BOX complete
+PASS wrong Kanban does not set reference or advance
+PASS wrong Box does not count and blocks finish until corrected
+PASS invalid parser result leaves reference and count unchanged
+PASS skip Stand still compares every Box against Kanban
+PASS clear last Box retains Stand and Kanban
+PASS clear only Box requires another Box before finishing
+PASS clear Kanban before Boxes goes back to Kanban
+PASS clear Stand before Kanban goes back to Stand
+PASS clear last item never dismisses a rejected scan
+PASS completed batch is immutable and has nothing removable
+PASS new batch clears previous references counts and error
+PASS customer callback is used for all comparisons
+PASS Box list cannot be externally cleared
+Passed 16 production-flow scenarios
 
-XML: 4 files parsed; 18 UI IDs resolved.
-Original parser and employee logic preserved byte-for-byte from v0.14.
-NOT RUN: Kotlin/Android compilation, full JUnit suite, APK build, PM75 device test.
-Reason: Android/Kotlin/Gradle toolchain unavailable; tool download timed out.
+XML: 4 files parsed; all 18 UI IDs resolved.
+TagParser.kt and EmployeeParser.kt preserved byte-for-byte from v0.15.
+Clear controls statically verified to remain visible; UI/device behavior not tested.
+No database deletion or schema change added; reset uses existing cancellation update.
+NOT RUN: Kotlin/Android compilation, full JUnit, APK build, Android device UI test.
