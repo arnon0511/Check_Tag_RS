@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CentralPayloadJsonTest {
-    private val session=CentralSession("session-1",0,1000,"Mr.Burin","OK","COMPARE","JCC60902004200","JCC60902004200","16171-05030",40,1,1,"","16171-05030","16171-05030",0,"0.18.0","PM75-A")
+    private val session=CentralSession("session-1",0,1000,"Mr.Burin","OK","COMPARE","JCC60902004200","JCC60902004200","16171-05030",40,1,1,"","16171-05030","16171-05030",0,"0.18.1","PM75-A")
 
     @Test fun payloadContainsSessionEventsAndEscapesRawData(){
         val event=CentralScanEvent("event-1",1,0,"KANBAN","A\"B\nC","abc","AISIN_KANBAN","16171-05030","aisin","1.0","SUCCESS","MATCH")

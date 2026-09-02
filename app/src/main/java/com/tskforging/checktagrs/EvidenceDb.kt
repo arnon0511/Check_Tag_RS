@@ -51,7 +51,7 @@ class EvidenceDb(context: Context) : SQLiteOpenHelper(context, "check_tag_rs.db"
     }
 
     fun startSession(id: String, checkStand: Boolean, employeeName: String, employeeRaw: String) = writableDatabase.insertOrThrow("sessions", null, ContentValues().apply {
-        put("session_id", id); put("started_at", System.currentTimeMillis()); put("app_version", "0.18.0")
+        put("session_id", id); put("started_at", System.currentTimeMillis()); put("app_version", "0.18.1")
         put("stand_check_mode", if(checkStand) "CHECK" else "SKIP")
         put("employee_name", employeeName); put("employee_raw", employeeRaw)
     })
@@ -93,10 +93,9 @@ class EvidenceDb(context: Context) : SQLiteOpenHelper(context, "check_tag_rs.db"
     private fun syncAttempts(id:String)=readableDatabase.rawQuery("SELECT sync_attempts FROM sessions WHERE session_id=?",arrayOf(id)).use{c->if(c.moveToFirst())c.getInt(0) else 0}
 
     fun buildSyncPayload(id:String,deviceId:String):String {
-        val session:CentralSession
-        readableDatabase.rawQuery("SELECT started_at,completed_at,employee_name,final_result,pick_list_mode,pick_list_jcc,kanban_jcc,kanban_part,work_qty,expected_boxes,actual_boxes,override_reason,stand_part,box_part,retry_count,app_version FROM sessions WHERE session_id=?",arrayOf(id)).use{c->
+        val session=readableDatabase.rawQuery("SELECT started_at,completed_at,employee_name,final_result,pick_list_mode,pick_list_jcc,kanban_jcc,kanban_part,work_qty,expected_boxes,actual_boxes,override_reason,stand_part,box_part,retry_count,app_version FROM sessions WHERE session_id=?",arrayOf(id)).use{c->
             require(c.moveToFirst()){ "Session not found" }
-            session=CentralSession(id,c.getLong(0),c.getLong(1),c.getString(2),c.getString(3),if(c.getString(4)=="CHECK")"COMPARE" else "SKIP",c.getString(5),c.getString(6),c.getString(7),c.getInt(8),c.getInt(9),c.getInt(10),c.getString(11),c.getString(12),c.getString(13),c.getInt(14),c.getString(15),deviceId)
+            CentralSession(id,c.getLong(0),c.getLong(1),c.getString(2),c.getString(3),if(c.getString(4)=="CHECK")"COMPARE" else "SKIP",c.getString(5),c.getString(6),c.getString(7),c.getInt(8),c.getInt(9),c.getInt(10),c.getString(11),c.getString(12),c.getString(13),c.getInt(14),c.getString(15),deviceId)
         }
         val events=mutableListOf<CentralScanEvent>()
         readableDatabase.rawQuery("SELECT event_id,scan_sequence,scanned_at,scan_target,raw_data_full,raw_sha256,detected_tag_type,extracted_part_no,parser_rule_id,parser_rule_version,parse_result,compare_result FROM scan_events WHERE session_id=? ORDER BY scan_sequence",arrayOf(id)).use{c->while(c.moveToNext())events+=CentralScanEvent(c.getString(0),c.getInt(1),c.getLong(2),c.getString(3),c.getString(4),c.getString(5),c.getString(6),c.getString(7),c.getString(8),c.getString(9),c.getString(10),c.getString(11))}

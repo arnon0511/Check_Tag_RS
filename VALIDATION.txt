@@ -25,3 +25,7 @@ Dashboard statically verified to show central sync state before Outlook. If stil
 Google Apps Script doGet was confirmed by the user to return API is ready. No production POST fixture was sent to avoid creating a false production row.
 Added CentralPayloadJsonTest for JSON escaping, session/event fields, parse-result mapping, and explicit API ok=true response.
 NOT RUN HERE: Kotlin/Android compilation, full JUnit including CentralPayloadJsonTest, APK build, Android device UI test, end-to-end production POST.
+
+v0.18.1 compile hotfix:
+- exportAndShare now shows the AlertDialog then returns Unit explicitly; it no longer attempts to return AlertDialog from a Unit function.
+- CentralSession is now returned directly from Cursor.use; it is no longer assigned to an outer val inside a lambda.

@@ -1,4 +1,4 @@
-# Check Tag_RS v0.18.0
+# Check Tag_RS v0.18.1
 
 Flow: พนักงาน → เลือกตรวจ/ข้าม Pick List → Pick List Aisin → KANBAN → กรอกจำนวนงานและจำนวน Box → Stand → Box ทุกกล่อง → BOX ครบ → Dashboard → ตรวจและส่ง Mail
 
@@ -31,7 +31,7 @@ v0.17.2:
 - เพิ่มแถบลำดับ `พนักงาน › Pick List › KANBAN › จำนวน › Stand › Box › Dashboard`
 - ทำเครื่องหมายขั้นที่ผ่านแล้ว ขั้นปัจจุบัน และบอกขั้นถัดไปเป็นข้อความชัดเจน
 
-versionCode 22 / versionName 0.18.0 / applicationId com.tskforging.checktagrs
+versionCode 23 / versionName 0.18.1 / applicationId com.tskforging.checktagrs
 
 ## Central Dashboard / Google Sheets (v0.18)
 
