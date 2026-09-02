@@ -1,6 +1,6 @@
 package com.tskforging.checktagrs
 
-enum class ScanTarget { STAND, BOX_TAG, KANBAN }
+enum class ScanTarget { PICK_LIST, STAND, BOX_TAG, KANBAN }
 
 data class ParseResult(val success: Boolean, val partNo: String?, val tagType: String, val ruleId: String, val ruleVersion: String, val message: String = "")
 

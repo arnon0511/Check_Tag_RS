@@ -5,7 +5,7 @@
     android:orientation="vertical" android:padding="18dp" android:background="#F8FAFC">
 
     <TextView android:id="@+id/title" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="CHECK TAG_RS v0.16.0" android:textStyle="bold" android:textSize="28sp" android:textColor="#101828" />
+        android:text="CHECK TAG_RS v0.17.0" android:textStyle="bold" android:textSize="28sp" android:textColor="#101828" />
     <TextView android:id="@+id/step" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginTop="10dp" android:text="SCAN EMPLOYEE" android:textStyle="bold"
         android:textSize="24sp" android:textColor="#155EEF" />

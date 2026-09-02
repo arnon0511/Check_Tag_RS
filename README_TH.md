@@ -1,86 +1,26 @@
-# Check Tag_RS v0.16.0
+# Check Tag_RS v0.17.0
 
-## ลำดับตามคำสั่งล่าสุด
+Flow: พนักงาน → เลือกตรวจ/ข้าม Pick List → Pick List Aisin → KANBAN → กรอกจำนวนงานและจำนวน Box → Stand → Box ทุกกล่อง → BOX ครบ → Dashboard → ตรวจและส่ง Mail
 
-**พนักงาน → Stand → KANBAN 1 ใบ → Box ทีละกล่อง → กด BOX ครบ**
+กฎ Aisin จากข้อมูลจริง:
+- JCC ใน KANBAN ต้องตรงกับด้านหน้าของ JCC ใน Pick List
+- ต้องพบรหัสร่วม `J631` และ `7D42`
+- Part No. ใช้ค่าจาก KANBAN เช่น `0116171-05030` → `16171-05030`
+- ไม่สนใจช่องว่างปกติ/Unicode และเก็บ RAW DATA เต็ม
 
-- สแกนพนักงานครั้งเดียวต่อชุด; คงตัวเลือกตรวจ/ข้าม Stand
-- สแกน KANBAN ผ่าน 1 ใบแล้วเข้าสู่ BOX ทันที ไม่มีปุ่ม KANBAN ครบ
-- KANBAN ใบนั้นใช้ตรวจ BOX ทุกกล่องในชุด ไม่ต้องสแกนเพิ่มตามจำนวนกล่อง
-- BOX ทุกกล่องต้องตรง KANBAN และ Stand เมื่อเปิดตรวจ Stand
-- จำนวนกล่องเพิ่มตามการสแกนที่ผ่าน ผู้ใช้กด BOX ครบเมื่อครบจำนวนจริง
-- ต้องมี BOX ผ่านอย่างน้อย 1 กล่อง และไม่มีรายการผิดที่ยังไม่แก้ จึงจบชุดได้
-- สแกนผิด: แสดงแดง ไม่เพิ่มจำนวน เก็บ RAW DATA และให้สแกนแก้
-- หลังจบชุด สแกนพนักงานใหม่เพื่อเริ่มชุดถัดไป
+จำนวน Box:
+- กรอกจำนวนงาน (PCS) และจำนวน Box ที่ต้องส่ง
+- นับเฉพาะ Box ที่ตรงกับ KANBAN และ Stand
+- จำนวนตรงบันทึก `OK`
+- ขาด/เกินต้องกรอกเหตุผลก่อนยืนยัน และบันทึก `WARNING`
 
-## ปุ่มล้างข้อมูลกลับมาอยู่ด้านบน
+Dashboard บน PM75 แสดงผู้ตรวจ, Part No., จำนวนงาน, Box กำหนด/Scan จริง, ผลต่าง และเหตุผลก่อนเปิด Outlook
+CSV/ประวัติเพิ่ม Pick List mode, JCC, จำนวนงาน, จำนวน Box, ผลต่าง และเหตุผล
+ผู้รับ Mail: `wirachai.so@tskforging.com`, `sart.ka@tskforging.com`, `arnon.ju@tskforging.com`
 
-ปุ่มอยู่ใต้ข้อความแนะนำขั้นตอน ก่อนแผงผลตรวจ และไม่ถูกซ่อนตามขั้นสแกน
-เมื่อยังไม่มีข้อมูลที่ล้างได้ ปุ่มจะเป็นสีจางแทนการหายไป
+ฐานข้อมูลอัปเกรดจาก schema 4 เป็น 5 โดยไม่ลบประวัติเดิม ลูกค้าอื่นยังเลือกข้าม Pick List ได้จนกว่าจะมีตัวอย่างจริง
 
-1. **ล้างรายการล่าสุด**: ถามยืนยันก่อนล้างรายการที่รับล่าสุดในชุดปัจจุบัน
-   - มี BOX: ล้าง BOX ล่าสุด 1 กล่อง โดยเก็บ KANBAN และ Stand
-   - ยังไม่มี BOX แต่มี KANBAN: ล้าง KANBAN แล้วกลับไปรอสแกน KANBAN
-   - ยังไม่มี KANBAN แต่มี Stand: ล้าง Stand แล้วกลับไปรอสแกน Stand
-   - หลังจบชุดแล้วไม่แก้ไขผลที่บันทึกย้อนหลัง
-2. **ล้างชุดปัจจุบัน / เริ่มใหม่**: ถามยืนยันก่อนเคลียร์พนักงาน, Stand, KANBAN, BOX และผลบนหน้าจอ
-   - หากกำลังตรวจ: ทำเครื่องหมายชุดนี้เป็น CANCELLED แล้วรอสแกนพนักงานใหม่
-   - หากจบชุดแล้ว: ล้างเฉพาะผลบนหน้าจอ แล้วรอสแกนพนักงานใหม่
+อัปโหลดไฟล์ภายในโฟลเดอร์ไป root ของ repository แล้วรัน GitHub Actions ต้องผ่าน `testDebugUnitTest assembleDebug` ก่อนดาวน์โหลด Artifact `Check_Tag_RS_v0.17_APK` ซึ่งมี `Check_Tag_RS_v0.17.apk`
 
-**ปุ่มทั้งสองไม่ลบประวัติที่บันทึกแล้วหรือ RAW DATA จากฐานข้อมูล**
-ปุ่มนี้เป็นการล้างรายการ/ชุดงานบนหน้าจอ ไม่ใช่การลบประวัติทั้งหมด
-บันทึกการกดล้างเป็น USER_ACTION เพื่อคงหลักฐาน; รายการยกเลิกยังอยู่ในฐานข้อมูลแต่ไม่แสดงเป็นงานสำเร็จในประวัติ/CSV เดิม
-การล้างรายการไม่ปิดข้อผิดพลาดโดยอัตโนมัติ ต้องสแกนรายการที่ถูกต้องก่อนจบชุด
-
-## การอ่านรหัสที่ใช้ได้แล้ว
-
-คง TagParser.kt และ EmployeeParser.kt เดิมทุกไบต์ ไม่แก้กฎอ่าน/เปรียบเทียบในรุ่นนี้:
-- Stand/Box อ่านรหัสตรง ๆ `TG028993-590 A` ได้ตามตัวแก้เดิม
-- คง DNTH DISC, ช่องว่างปกติ/Unicode, FG Tag, I-prefix, JTEKT, Aisin และ SNSS
-- JTEKT คงกฎก่อนขีดแรก; DNTH คงเปรียบเทียบเต็มรวม suffix
-- Item เดียวกันต่าง Lot ยังคงสแกนได้; ไม่ได้เพิ่มการตรวจ serial ฉลากซ้ำ
-
-คง SQLite schema เดิม ไม่ลบฐานข้อมูล ไม่เปลี่ยนผู้รับ Outlook:
-`wirachai.so@tskforging.com`, `sart.ka@tskforging.com`
-CSV เก็บ KANBAN 1 ค่าและ BOX ทุกกล่อง พร้อม RAW และการล้างรายการ
-ขั้นตอนบังคับส่งอีเมลยืนยันก่อนอนุมัติข้ามงานผิดยังไม่รวมในรุ่นนี้ และยังไม่อนุญาตข้ามผลไม่ตรงให้ผ่าน
-
-## ผลตรวจ
-
-- Compile และรันตัวควบคุมที่แอปใช้จริง `SingleKanbanBatchFlow.java` ผ่าน 16 กรณีด้วย Java 17
-- รวมกรณี KANBAN 1 ใบ / BOX 5 กล่อง, ล้าง BOX/KANBAN/Stand, ล้างแล้วเริ่มใหม่, ปฏิเสธรหัสผิด และห้ามแก้ชุดที่จบแล้ว
-- ตรวจ XML 4 ไฟล์และการอ้างอิง ID หน้าจอ 18 รายการ
-- ตรวจ parser และ employee logic เทียบ v0.15 ทุกไบต์
-- ผลอยู่ใน `VALIDATION.txt`
-
-**ยังไม่ยืนยัน Build Android/Kotlin ทั้งแอป, JUnit ทั้งชุด, APK หรือการกดปุ่มบน PM75 จริง**
-สภาพแวดล้อมนี้ไม่มีชุดเครื่องมือ Android/Kotlin/Gradle จึงส่งเป็น source สำหรับ GitHub Actions
-ผลทดสอบ Java ไม่ใช่ผลทดสอบหน้าจอ Android หรือ parser Kotlin; มีชุดทดสอบรวม parser จริงเตรียมไว้ให้ Actions
-
-## สร้าง APK
-
-1. แตก ZIP และอัปโหลดไฟล์ด้านใน `Check_Tag_RS_Android_v0.16` ไปยัง root ของ repository Check-Tag-RS
-2. รวมไฟล์ `.github/workflows/build-apk.yml`, `SingleKanbanBatchFlow.java`, `SingleKanbanBatchFlowChecks.java`, `SingleKanbanBatchFlowTest.kt`
-3. หากมีไฟล์เก่า MultiKanbanFlow.java, MultiKanbanFlowChecks.java, MultiKanbanFlowTest.kt หรือ SingleKanbanFlow.kt/SingleKanbanFlowTest.kt สามารถลบไฟล์เก่าที่เลิกใช้ได้ โดยอย่าลบไฟล์ใหม่ที่มีชื่อ SingleKanbanBatchFlow
-4. GitHub → Actions → Build Check Tag_RS APK → Run workflow
-5. ต้องผ่าน `testDebugUnitTest assembleDebug` ก่อนดาวน์โหลด Artifact **Check_Tag_RS_v0.16_APK**
-6. ภายในมี **Check_Tag_RS_v0.16.apk**
-
-ยังไม่ได้อัปโหลดหรือสั่ง Build ใน GitHub จากแชตนี้
-versionCode 18 / versionName 0.16.0 / applicationId com.tskforging.checktagrs
-สำรอง CSV ก่อนอัปเดต ถ้าลายเซ็นไม่ตรงอย่าถอนแอปทันที เพราะประวัติในเครื่องอาจหาย
-
-## ทดลองหลัง Build ผ่าน
-
-สแกน `EMPLOYEE|Mr.Burin` → เลือกตรวจ Stand → `TG028993-590 A` → KANBAN ที่ตรง 1 ใบ
-ต้องเข้าสู่ BOX ทันที → สแกน BOX 3 กล่อง → ตัวนับเป็น 3 และไม่ขอ KANBAN เพิ่ม → กด BOX ครบ
-กดล้างชุดปัจจุบัน → กลับรอสแกนพนักงาน และประวัติชุดที่จบต้องยังอยู่
-ทดสอบระหว่างสแกนด้วย: ล้าง BOX ล่าสุดแล้วสแกนใหม่, ล้าง KANBAN ก่อนเริ่ม BOX, กดยกเลิกในหน้าถามยืนยันต้องไม่เปลี่ยนข้อมูล
-ทดสอบ BOX ต่าง suffix `TG028993-590B` ต้องแดงและไม่นับ
-
-## รันการตรวจลำดับโดยไม่ใช้ Android SDK
-
-จาก root โปรเจกต์ ใช้ Java 17 ที่มี compiler module:
-```sh
-java tools/RunFlowChecks.java
-```
+versionCode 19 / versionName 0.17.0 / applicationId com.tskforging.checktagrs
+ยังไม่ยืนยัน Android/Kotlin build หรือทดสอบบน PM75 จนกว่า GitHub Actions จะผ่าน
