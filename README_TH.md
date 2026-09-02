@@ -1,4 +1,4 @@
-# Check Tag_RS v0.17.1
+# Check Tag_RS v0.17.2
 
 Flow: พนักงาน → เลือกตรวจ/ข้าม Pick List → Pick List Aisin → KANBAN → กรอกจำนวนงานและจำนวน Box → Stand → Box ทุกกล่อง → BOX ครบ → Dashboard → ตรวจและส่ง Mail
 
@@ -24,5 +24,12 @@ CSV/ประวัติเพิ่ม Pick List mode, JCC, จำนวนง
 
 Hotfix v0.17.1: รักษาตัวคั่นของช่อง JCC เพื่อไม่ให้เลขช่องถัดไปถูกต่อรวมกับเลขอ้างอิง และยังรองรับช่องว่าง Unicode
 
-versionCode 20 / versionName 0.17.1 / applicationId com.tskforging.checktagrs
+v0.17.2:
+- เตือนทันทีเมื่อ Scan Box เกินจำนวนที่กำหนด
+- เลือกลบ Box ล่าสุดหรือเก็บ Box ที่เกินไว้เพื่อยืนยันส่งภายหลัง
+- เปิดปุ่มลบเมื่อมีข้อมูลที่ลบได้ และปิดเมื่อไม่มีข้อมูล
+- เพิ่มแถบลำดับ `พนักงาน › Pick List › KANBAN › จำนวน › Stand › Box › Dashboard`
+- ทำเครื่องหมายขั้นที่ผ่านแล้ว ขั้นปัจจุบัน และบอกขั้นถัดไปเป็นข้อความชัดเจน
+
+versionCode 21 / versionName 0.17.2 / applicationId com.tskforging.checktagrs
 ยังไม่ยืนยัน Android/Kotlin build หรือทดสอบบน PM75 จนกว่า GitHub Actions จะผ่าน
