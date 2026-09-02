@@ -1,4 +1,4 @@
-# Check Tag_RS v0.17.2
+# Check Tag_RS v0.18.0
 
 Flow: พนักงาน → เลือกตรวจ/ข้าม Pick List → Pick List Aisin → KANBAN → กรอกจำนวนงานและจำนวน Box → Stand → Box ทุกกล่อง → BOX ครบ → Dashboard → ตรวจและส่ง Mail
 
@@ -31,5 +31,16 @@ v0.17.2:
 - เพิ่มแถบลำดับ `พนักงาน › Pick List › KANBAN › จำนวน › Stand › Box › Dashboard`
 - ทำเครื่องหมายขั้นที่ผ่านแล้ว ขั้นปัจจุบัน และบอกขั้นถัดไปเป็นข้อความชัดเจน
 
-versionCode 21 / versionName 0.17.2 / applicationId com.tskforging.checktagrs
+versionCode 22 / versionName 0.18.0 / applicationId com.tskforging.checktagrs
+
+## Central Dashboard / Google Sheets (v0.18)
+
+- ส่งชุดงานที่จบแล้วไปยัง Google Apps Script endpoint ของ Check Tag_RS
+- ส่งทั้งข้อมูลสรุป `Sessions` และหลักฐาน `Scan Events` รวม RAW DATA
+- ใช้ `session_id` เดิมทุกครั้ง เพื่อให้ฝั่ง Apps Script ป้องกันรายการซ้ำ
+- บันทึกสถานะใน SQLite: `PENDING`, `SENDING`, `SYNCED`
+- ใช้ WorkManager รอเครือข่ายและส่งคิวซ้ำอัตโนมัติเมื่อ PM75 กลับมาออนไลน์
+- Dashboard บน PM75 แสดงสถานะข้อมูลกลางก่อนเปิด Outlook
+- ถ้ายัง Sync ไม่สำเร็จ ผู้ใช้จะได้รับคำเตือนและเลือกว่าจะรอก่อนหรือเปิด Outlook ต่อ
+- Endpoint: `https://script.google.com/macros/s/AKfycbxS-jaE6QBM_JE3UbuNRk3ighMvtPsUTGyeleMYkM4oUAK0Kh05yS6EU7kDOtqUn_3Ziw/exec`
 ยังไม่ยืนยัน Android/Kotlin build หรือทดสอบบน PM75 จนกว่า GitHub Actions จะผ่าน

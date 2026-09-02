@@ -10,8 +10,8 @@ android {
         applicationId = "com.tskforging.checktagrs"
         minSdk = 30
         targetSdk = 35
-        versionCode = 21
-        versionName = "0.17.2"
+        versionCode = 22
+        versionName = "0.18.0"
     }
 
     compileOptions {
@@ -27,5 +27,6 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
     testImplementation("junit:junit:4.13.2")
 }

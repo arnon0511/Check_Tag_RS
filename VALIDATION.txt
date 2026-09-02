@@ -19,5 +19,9 @@ Passed 16 production-flow scenarios
 XML: 4 files parsed; all 18 UI IDs resolved.
 TagParser.kt and EmployeeParser.kt preserved byte-for-byte from v0.15.
 Clear controls statically verified to remain visible; UI/device behavior not tested.
-No database deletion or schema change added; reset uses existing cancellation update.
-NOT RUN: Kotlin/Android compilation, full JUnit, APK build, Android device UI test.
+SQLite upgraded in place from schema 5 to 6; no table/data deletion. Legacy completed sessions remain NOT_READY and are not uploaded automatically.
+Central sync statically verified: fixed Apps Script /exec endpoint, INTERNET and ACCESS_NETWORK_STATE permissions, WorkManager CONNECTED constraint, PENDING/SENDING/SYNCED states, retry queue, session_id duplicate protection contract.
+Dashboard statically verified to show central sync state before Outlook. If still pending, user must choose wait or continue to Outlook.
+Google Apps Script doGet was confirmed by the user to return API is ready. No production POST fixture was sent to avoid creating a false production row.
+Added CentralPayloadJsonTest for JSON escaping, session/event fields, parse-result mapping, and explicit API ok=true response.
+NOT RUN HERE: Kotlin/Android compilation, full JUnit including CentralPayloadJsonTest, APK build, Android device UI test, end-to-end production POST.

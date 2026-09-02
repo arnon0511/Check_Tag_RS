@@ -11,6 +11,11 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import java.io.File
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
@@ -42,7 +47,7 @@ class MainActivity : AppCompatActivity() {
         rescanButton.setOnClickListener{focusScanner()};nextButton.setOnClickListener{resetAll()};clearButton.setOnClickListener{clearLast()}
         findViewById<Button>(R.id.historyButton).setOnClickListener{showHistory()};findViewById<Button>(R.id.exportButton).setOnClickListener{exportAndShare()};resetAll()
     }
-    override fun onResume(){super.onResume();focusScanner()}
+    override fun onResume(){super.onResume();if(db.pendingSyncIds().isNotEmpty())enqueueCentralSync();focusScanner()}
     private fun consumeScan(){val raw=input.text.toString();input.setText("");if(raw.isBlank())return
         when(stage){
             Stage.EMPLOYEE->{val e=EmployeeParser.parse(raw)?:return showError("QR พนักงานไม่ถูกต้อง","ต้องเป็น EMPLOYEE|ชื่อ")
@@ -82,9 +87,9 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
     private fun complete(result:String,reason:String){stage=Stage.DASHBOARD;val parts=mapOf(ScanTarget.STAND to standPart,ScanTarget.KANBAN to kanbanPart,ScanTarget.BOX_TAG to boxes.joinToString(" | "))
-        db.finishSession(sessionId,result,retryCount,parts,boxes.size,reason);showDashboard(result)}
+        db.finishSession(sessionId,result,retryCount,parts,boxes.size,reason);showDashboard(result);enqueueCentralSync()}
     private fun showDashboard(result:String){whitePanel();status.text=if(result=="OK")"OK — พร้อมส่ง" else "WARNING — ยืนยันส่ง";status.setTextColor(Color.WHITE);panel.setBackgroundColor(if(result=="OK")Color.rgb(3,152,85)else Color.rgb(245,158,11))
-        employeeView.text="ผู้ตรวจ: $employeeName";kanbanView.text="Part No.\n$kanbanPart";standView.text="จำนวนงาน\n$workQty PCS";boxView.text="BOX\nกำหนด $expectedBoxes / Scan ${boxes.size}";difference.text=boxDifference()+(if(overrideReason.isNotBlank())"\nเหตุผล: $overrideReason" else "")
+        employeeView.text="ผู้ตรวจ: $employeeName";kanbanView.text="Part No.\n$kanbanPart";standView.text="จำนวนงาน\n$workQty PCS";boxView.text="BOX\nกำหนด $expectedBoxes / Scan ${boxes.size}";difference.text=boxDifference()+(if(overrideReason.isNotBlank())"\nเหตุผล: $overrideReason" else "")+"\nข้อมูลกลาง: "+syncLabel(db.syncStatus(sessionId))
         listOf(employeeView,kanbanView,standView,boxView,difference).forEach{it.setTextColor(Color.WHITE)};stepView.text="DASHBOARD";instruction.text="ขั้นถัดไป: ตรวจข้อมูลและส่ง Mail";updateFlowBar();boxDoneButton.visibility=View.GONE;clearButton.visibility=View.GONE;rescanButton.visibility=View.GONE;nextButton.visibility=View.VISIBLE;nextButton.text="เริ่มชุดใหม่";rawButton.visibility=View.VISIBLE;findViewById<Button>(R.id.exportButton).text="ตรวจและส่ง Mail"}
     private fun boxDifference()=when(BoxCountEvaluator.status(expectedBoxes,boxes.size)){BoxCountStatus.MATCH->"จำนวน Box ตรงกัน";BoxCountStatus.UNDER->"ขาด ${expectedBoxes-boxes.size} Box";BoxCountStatus.OVER->"เกิน ${boxes.size-expectedBoxes} Box"}
     private fun updateUi(){whitePanel();employeeView.text="ผู้ตรวจ: ${employeeName.ifBlank{"—"}}";kanbanView.text="KANBAN\n${kanbanPart.ifBlank{"—"}}";standView.text="STAND\n${standPart.ifBlank{"—"}}";boxView.text="BOX TAG\n${boxes.size} / ${if(expectedBoxes>0)expectedBoxes else "—"}";difference.text=if(expectedBoxes>0)boxDifference()else ""
@@ -96,14 +101,21 @@ class MainActivity : AppCompatActivity() {
     }
     private fun clearLast(){when{stage==Stage.BOX&&boxes.isNotEmpty()->boxes.removeAt(boxes.lastIndex);stage==Stage.BOX->{standPart="";stage=Stage.STAND};stage==Stage.STAND->{kanbanPart="";kanbanRaw="";stage=Stage.KANBAN};stage==Stage.KANBAN&&comparePick->{pickRaw="";stage=Stage.PICK_LIST};else->return};pendingError=false;updateUi()}
     private fun reject(t:ScanTarget,raw:String,p:ParseResult,title:String){retryCount++;pendingError=true;saveEvidence(t,raw,p.tagType,p.partNo,"MISMATCH");showError(title,p.message.ifBlank{"กรุณาตรวจและ Scan ใหม่"})}
-    private fun saveEvidence(t:ScanTarget,raw:String,type:String,part:String?,compare:String){sequence++;db.saveEvent(ScanEvidence(UUID.randomUUID().toString(),sessionId,sequence,System.currentTimeMillis(),t,raw,sha256(raw),type,part,"v017_flow","1.0","SUCCESS",compare,null));rawEvents+="#$sequence ${t.name}\n$raw"}
+    private fun saveEvidence(t:ScanTarget,raw:String,type:String,part:String?,compare:String){sequence++;db.saveEvent(ScanEvidence(UUID.randomUUID().toString(),sessionId,sequence,System.currentTimeMillis(),t,raw,sha256(raw),type,part,"v018_central_sync","1.0","SUCCESS",compare,null));rawEvents+="#$sequence ${t.name}\n$raw"}
     private fun showError(title:String,msg:String){status.text=title;status.setTextColor(Color.WHITE);panel.setBackgroundColor(Color.rgb(217,45,32));difference.text=msg;difference.setTextColor(Color.WHITE);rescanButton.visibility=View.VISIBLE;rawButton.visibility=View.VISIBLE;focusScanner()}
     private fun showNormal(text:String){whitePanel();status.text=text;status.setTextColor(Color.rgb(6,118,71));difference.text=""}
     private fun confirmReset(){AlertDialog.Builder(this).setTitle("ล้างชุดปัจจุบัน?").setMessage("ข้อมูลชุดนี้จะถูกยกเลิก แต่ RAW DATA ยังอยู่").setNegativeButton("ยกเลิก",null).setPositiveButton("ล้างชุด"){_,_->if(sessionId.isNotEmpty())db.cancelSession(sessionId);resetAll()}.show()}
     private fun resetAll(){stage=Stage.EMPLOYEE;sessionId="";sequence=0;retryCount=0;employeeName="";employeeRaw="";pickRaw="";pickMatch=null;kanbanRaw="";kanbanPart="";standPart="";workQty=0;expectedBoxes=0;boxes.clear();pendingError=false;overrideReason="";rawEvents.clear();whitePanel();status.text="รอ Scan พนักงาน";stepView.text="SCAN EMPLOYEE";instruction.text="ตอนนี้: Scan QR พนักงาน • ถัดไป: เลือก Pick List";updateFlowBar();employeeView.text="ผู้ตรวจ: —";standView.text="STAND\n—";kanbanView.text="KANBAN\n—";boxView.text="BOX TAG\n0";difference.text="";listOf(rawButton,boxDoneButton,resetBatchButton,rescanButton,nextButton,clearButton).forEach{it.visibility=View.GONE};clearButton.isEnabled=false;focusScanner()}
     private fun showRaw()=AlertDialog.Builder(this).setTitle("RAW DATA").setMessage(rawEvents.joinToString("\n\n").ifBlank{"—"}).setPositiveButton("ปิด",null).show()
     private fun showHistory(){val items=db.history();if(items.isEmpty())return;val labels=items.map{"${Date(it.startedAt)} ${it.result}\n${it.employeeName} • ${it.partNo}"}.toTypedArray();AlertDialog.Builder(this).setTitle("ประวัติ").setItems(labels){_,i->AlertDialog.Builder(this).setTitle("รายละเอียด").setMessage(db.historyDetail(items[i].sessionId)).setPositiveButton("ปิด",null).show()}.setNegativeButton("ปิด",null).show()}
-    private fun exportAndShare(){try{val ts=SimpleDateFormat("yyyy-MM-dd_HHmmss",Locale.US).format(Date());val file=db.exportCsv(File(cacheDir,"exports/CheckTag_RS_$ts.csv"));val uri=FileProvider.getUriForFile(this,"$packageName.files",file);val send=Intent(Intent.ACTION_SEND).apply{type="text/csv";putExtra(Intent.EXTRA_EMAIL,arrayOf("wirachai.so@tskforging.com","sart.ka@tskforging.com","arnon.ju@tskforging.com"));putExtra(Intent.EXTRA_STREAM,uri);putExtra(Intent.EXTRA_SUBJECT,"Check Tag_RS $kanbanPart ${if(overrideReason.isBlank())"OK" else "WARNING"}");putExtra(Intent.EXTRA_TEXT,"ผู้ตรวจ: $employeeName\nจำนวนงาน: $workQty PCS\nBOX: กำหนด $expectedBoxes / Scan ${boxes.size}\n${boxDifference()}\n${if(overrideReason.isNotBlank())"เหตุผล: $overrideReason" else ""}");clipData=ClipData.newRawUri(file.name,uri);addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)};try{startActivity(Intent(send).apply{setPackage("com.microsoft.office.outlook")})}catch(_:Exception){startActivity(Intent.createChooser(send,"เลือกแอป Mail"))}}catch(e:Exception){Toast.makeText(this,"ส่งออกไม่สำเร็จ: ${e.message}",Toast.LENGTH_LONG).show()}}
+    private fun exportAndShare(){if(stage==Stage.DASHBOARD&&db.syncStatus(sessionId)!="SYNCED")return AlertDialog.Builder(this).setTitle("ข้อมูลกลางยังรอส่ง").setMessage("แอปเก็บคิวไว้แล้วและจะส่งเมื่อมีอินเทอร์เน็ต\n\nต้องการเปิด Outlook ต่อหรือไม่?").setNegativeButton("รอให้ Sync สำเร็จ",null).setPositiveButton("เปิด Outlook"){_,_->shareCsv()}.show();shareCsv()}
+    private fun shareCsv(){try{val ts=SimpleDateFormat("yyyy-MM-dd_HHmmss",Locale.US).format(Date());val file=db.exportCsv(File(cacheDir,"exports/CheckTag_RS_$ts.csv"));val uri=FileProvider.getUriForFile(this,"$packageName.files",file);val send=Intent(Intent.ACTION_SEND).apply{type="text/csv";putExtra(Intent.EXTRA_EMAIL,arrayOf("wirachai.so@tskforging.com","sart.ka@tskforging.com","arnon.ju@tskforging.com"));putExtra(Intent.EXTRA_STREAM,uri);putExtra(Intent.EXTRA_SUBJECT,"Check Tag_RS $kanbanPart ${if(overrideReason.isBlank())"OK" else "WARNING"}");putExtra(Intent.EXTRA_TEXT,"ผู้ตรวจ: $employeeName\nจำนวนงาน: $workQty PCS\nBOX: กำหนด $expectedBoxes / Scan ${boxes.size}\n${boxDifference()}\n${if(overrideReason.isNotBlank())"เหตุผล: $overrideReason" else ""}");clipData=ClipData.newRawUri(file.name,uri);addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)};try{startActivity(Intent(send).apply{setPackage("com.microsoft.office.outlook")})}catch(_:Exception){startActivity(Intent.createChooser(send,"เลือกแอป Mail"))}}catch(e:Exception){Toast.makeText(this,"ส่งออกไม่สำเร็จ: ${e.message}",Toast.LENGTH_LONG).show()}}
+    private fun enqueueCentralSync(){
+        val request=OneTimeWorkRequestBuilder<CentralSyncWorker>().setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).build()
+        WorkManager.getInstance(this).enqueueUniqueWork("check_tag_rs_central_sync",ExistingWorkPolicy.REPLACE,request)
+        WorkManager.getInstance(this).getWorkInfoByIdLiveData(request.id).observe(this){if(stage==Stage.DASHBOARD&&sessionId.isNotBlank()){showDashboard(if(overrideReason.isBlank())"OK" else "WARNING")}}
+    }
+    private fun syncLabel(value:String)=when(value){"SYNCED"->"ส่งสำเร็จ ✓";"SENDING"->"กำลังส่ง…";"PENDING"->"รออินเทอร์เน็ต/รอส่ง";else->value}
     private fun whitePanel(){panel.setBackgroundColor(Color.WHITE);listOf(employeeView,standView,boxView,kanbanView,difference).forEach{it.setTextColor(Color.rgb(16,24,40))};status.setTextColor(Color.rgb(52,64,84))}
     private fun focusScanner(){input.requestFocus();(getSystemService(INPUT_METHOD_SERVICE)as InputMethodManager).hideSoftInputFromWindow(input.windowToken,0)}
     private fun sha256(s:String)=MessageDigest.getInstance("SHA-256").digest(s.toByteArray()).joinToString(""){"%02x".format(it)}

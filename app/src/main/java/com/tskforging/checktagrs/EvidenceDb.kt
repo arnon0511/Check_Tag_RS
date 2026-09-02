@@ -9,11 +9,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class EvidenceDb(context: Context) : SQLiteOpenHelper(context, "check_tag_rs.db", null, 5) {
+class EvidenceDb(context: Context) : SQLiteOpenHelper(context, "check_tag_rs.db", null, 6) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""CREATE TABLE sessions(session_id TEXT PRIMARY KEY,started_at INTEGER NOT NULL,completed_at INTEGER,final_result TEXT NOT NULL DEFAULT 'IN_PROGRESS',retry_count INTEGER NOT NULL DEFAULT 0,app_version TEXT NOT NULL,stand_part TEXT,box_part TEXT,kanban_part TEXT,stand_check_mode TEXT NOT NULL DEFAULT 'CHECK',employee_name TEXT NOT NULL DEFAULT '',employee_raw TEXT NOT NULL DEFAULT '')""")
         db.execSQL("""CREATE TABLE scan_events(event_id TEXT PRIMARY KEY,session_id TEXT NOT NULL,scan_sequence INTEGER NOT NULL,scanned_at INTEGER NOT NULL,scan_target TEXT NOT NULL,raw_data_full TEXT NOT NULL,raw_length INTEGER NOT NULL,raw_sha256 TEXT NOT NULL,detected_tag_type TEXT NOT NULL,extracted_part_no TEXT,parser_rule_id TEXT NOT NULL,parser_rule_version TEXT NOT NULL,parse_result TEXT NOT NULL,compare_result TEXT NOT NULL,rescan_of_event_id TEXT)""")
         addInspectionColumns(db)
+        addSyncColumns(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -28,6 +29,7 @@ class EvidenceDb(context: Context) : SQLiteOpenHelper(context, "check_tag_rs.db"
             db.execSQL("ALTER TABLE sessions ADD COLUMN employee_raw TEXT NOT NULL DEFAULT ''")
         }
         if (oldVersion < 5) addInspectionColumns(db)
+        if (oldVersion < 6) addSyncColumns(db)
     }
 
     private fun addInspectionColumns(db: SQLiteDatabase) {
@@ -41,8 +43,15 @@ class EvidenceDb(context: Context) : SQLiteOpenHelper(context, "check_tag_rs.db"
         db.execSQL("ALTER TABLE sessions ADD COLUMN override_reason TEXT NOT NULL DEFAULT ''")
     }
 
+    private fun addSyncColumns(db: SQLiteDatabase) {
+        db.execSQL("ALTER TABLE sessions ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'NOT_READY'")
+        db.execSQL("ALTER TABLE sessions ADD COLUMN sync_attempts INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE sessions ADD COLUMN sync_last_error TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE sessions ADD COLUMN sync_last_at INTEGER")
+    }
+
     fun startSession(id: String, checkStand: Boolean, employeeName: String, employeeRaw: String) = writableDatabase.insertOrThrow("sessions", null, ContentValues().apply {
-        put("session_id", id); put("started_at", System.currentTimeMillis()); put("app_version", "0.17.0")
+        put("session_id", id); put("started_at", System.currentTimeMillis()); put("app_version", "0.18.0")
         put("stand_check_mode", if(checkStand) "CHECK" else "SKIP")
         put("employee_name", employeeName); put("employee_raw", employeeRaw)
     })
@@ -67,7 +76,32 @@ class EvidenceDb(context: Context) : SQLiteOpenHelper(context, "check_tag_rs.db"
             put("completed_at", System.currentTimeMillis()); put("final_result", result); put("retry_count", retries)
             put("stand_part", parts[ScanTarget.STAND]); put("box_part", parts[ScanTarget.BOX_TAG]); put("kanban_part", parts[ScanTarget.KANBAN])
             put("actual_boxes",actualBoxes); put("override_reason",overrideReason)
+            put("sync_status","PENDING"); put("sync_last_error","")
         }, "session_id=?", arrayOf(id))
+
+    fun pendingSyncIds(): List<String> {
+        val ids=mutableListOf<String>()
+        readableDatabase.rawQuery("SELECT session_id FROM sessions WHERE final_result IN ('OK','WARNING') AND sync_status IN ('PENDING','SENDING','ERROR') ORDER BY completed_at",null).use{c->while(c.moveToNext())ids+=c.getString(0)}
+        return ids
+    }
+
+    fun syncStatus(id:String):String = readableDatabase.rawQuery("SELECT sync_status FROM sessions WHERE session_id=?",arrayOf(id)).use{c->if(c.moveToFirst())c.getString(0) else "NOT_FOUND"}
+
+    fun markSyncing(id:String)=writableDatabase.update("sessions",ContentValues().apply{put("sync_status","SENDING");put("sync_attempts",1+syncAttempts(id));put("sync_last_at",System.currentTimeMillis())},"session_id=?",arrayOf(id))
+    fun markSynced(id:String)=writableDatabase.update("sessions",ContentValues().apply{put("sync_status","SYNCED");put("sync_last_error","");put("sync_last_at",System.currentTimeMillis())},"session_id=?",arrayOf(id))
+    fun markPending(id:String,error:String)=writableDatabase.update("sessions",ContentValues().apply{put("sync_status","PENDING");put("sync_last_error",error.take(500));put("sync_last_at",System.currentTimeMillis())},"session_id=?",arrayOf(id))
+    private fun syncAttempts(id:String)=readableDatabase.rawQuery("SELECT sync_attempts FROM sessions WHERE session_id=?",arrayOf(id)).use{c->if(c.moveToFirst())c.getInt(0) else 0}
+
+    fun buildSyncPayload(id:String,deviceId:String):String {
+        val session:CentralSession
+        readableDatabase.rawQuery("SELECT started_at,completed_at,employee_name,final_result,pick_list_mode,pick_list_jcc,kanban_jcc,kanban_part,work_qty,expected_boxes,actual_boxes,override_reason,stand_part,box_part,retry_count,app_version FROM sessions WHERE session_id=?",arrayOf(id)).use{c->
+            require(c.moveToFirst()){ "Session not found" }
+            session=CentralSession(id,c.getLong(0),c.getLong(1),c.getString(2),c.getString(3),if(c.getString(4)=="CHECK")"COMPARE" else "SKIP",c.getString(5),c.getString(6),c.getString(7),c.getInt(8),c.getInt(9),c.getInt(10),c.getString(11),c.getString(12),c.getString(13),c.getInt(14),c.getString(15),deviceId)
+        }
+        val events=mutableListOf<CentralScanEvent>()
+        readableDatabase.rawQuery("SELECT event_id,scan_sequence,scanned_at,scan_target,raw_data_full,raw_sha256,detected_tag_type,extracted_part_no,parser_rule_id,parser_rule_version,parse_result,compare_result FROM scan_events WHERE session_id=? ORDER BY scan_sequence",arrayOf(id)).use{c->while(c.moveToNext())events+=CentralScanEvent(c.getString(0),c.getInt(1),c.getLong(2),c.getString(3),c.getString(4),c.getString(5),c.getString(6),c.getString(7),c.getString(8),c.getString(9),c.getString(10),c.getString(11))}
+        return CentralPayloadJson.encode(session,events)
+    }
 
     fun cancelSession(id: String) = writableDatabase.update("sessions", ContentValues().apply {
         put("completed_at", System.currentTimeMillis()); put("final_result", "CANCELLED")
