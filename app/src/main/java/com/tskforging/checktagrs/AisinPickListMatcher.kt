@@ -15,13 +15,15 @@ object AisinPickListMatcher {
     private val route = Regex("\\d[A-Z]\\d{2}", RegexOption.IGNORE_CASE)
 
     fun compare(pickRaw: String, kanbanRaw: String): AisinDocumentMatch {
-        val pick = compact(pickRaw)
-        val kanban = compact(kanbanRaw)
-        val pickJcc = jcc.find(pick)?.value?.uppercase()
-        val kanbanJcc = jcc.find(kanban)?.value?.uppercase()
+        val pickDocument = normalizeSeparators(pickRaw)
+        val kanbanDocument = normalizeSeparators(kanbanRaw)
+        val pickJcc = jcc.find(pickDocument)?.value?.uppercase()
+        val kanbanJcc = jcc.find(kanbanDocument)?.value?.uppercase()
         if (pickJcc == null || kanbanJcc == null)
             return AisinDocumentMatch(false, pickJcc, kanbanJcc, message="ไม่พบเลขอ้างอิง JCC ใน Pick List หรือ KANBAN")
 
+        val pick = compact(pickRaw)
+        val kanban = compact(kanbanRaw)
         val commonGroup = group.findAll(kanban).map { it.value.uppercase() }
             .firstOrNull { pick.contains(it) }
         val commonRoute = route.findAll(kanban).map { it.value.uppercase() }
@@ -34,4 +36,7 @@ object AisinPickListMatcher {
     }
 
     private fun compact(raw: String) = raw.filterNot { it.isWhitespace() || Character.isSpaceChar(it) }.uppercase()
+    private fun normalizeSeparators(raw: String) = raw.map {
+        if (it.isWhitespace() || Character.isSpaceChar(it)) ' ' else it.uppercaseChar()
+    }.joinToString("").replace(Regex(" +"), " ").trim()
 }

@@ -1,4 +1,4 @@
-# Check Tag_RS v0.17.0
+# Check Tag_RS v0.17.1
 
 Flow: พนักงาน → เลือกตรวจ/ข้าม Pick List → Pick List Aisin → KANBAN → กรอกจำนวนงานและจำนวน Box → Stand → Box ทุกกล่อง → BOX ครบ → Dashboard → ตรวจและส่ง Mail
 
@@ -22,5 +22,7 @@ CSV/ประวัติเพิ่ม Pick List mode, JCC, จำนวนง
 
 อัปโหลดไฟล์ภายในโฟลเดอร์ไป root ของ repository แล้วรัน GitHub Actions ต้องผ่าน `testDebugUnitTest assembleDebug` ก่อนดาวน์โหลด Artifact `Check_Tag_RS_v0.17_APK` ซึ่งมี `Check_Tag_RS_v0.17.apk`
 
-versionCode 19 / versionName 0.17.0 / applicationId com.tskforging.checktagrs
+Hotfix v0.17.1: รักษาตัวคั่นของช่อง JCC เพื่อไม่ให้เลขช่องถัดไปถูกต่อรวมกับเลขอ้างอิง และยังรองรับช่องว่าง Unicode
+
+versionCode 20 / versionName 0.17.1 / applicationId com.tskforging.checktagrs
 ยังไม่ยืนยัน Android/Kotlin build หรือทดสอบบน PM75 จนกว่า GitHub Actions จะผ่าน
