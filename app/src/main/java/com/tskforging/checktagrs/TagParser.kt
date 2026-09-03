@@ -27,7 +27,7 @@ object TagParser {
     // from a multi-field Kanban, employee QR, or arbitrary label text.
     private fun plainDnthPart(raw: String): String? {
         val value = normalizePart(raw)
-        return value.takeIf { Regex("^(?:TG\\d{6}|TGY\\d{5})-[A-Z0-9]{4}$").matches(it) }
+        return value.takeIf { Regex("^(?:TG\\d{6}|TGY\\d{5})-[A-Z0-9]{4,10}$").matches(it) }
     }
 
     fun stand(rawInput: String): ParseResult {
@@ -51,7 +51,7 @@ object TagParser {
             return ParseResult(true, normalizePart(fields[3]), "FG_TAG", "fg_pipe_field_4_normalized", "2.0")
         // DNTH box labels may add an "I" prefix to the Kanban Part No.
         // Example: ITG028351-5130 on BOX TAG matches TG028351-5130 on KANBAN.
-        val dnthBox = Regex("^I(TG\\d{6}-[A-Z0-9]{4}|TGY\\d{5}-[A-Z0-9]{4})$", RegexOption.IGNORE_CASE)
+        val dnthBox = Regex("^I(TG\\d{6}-[A-Z0-9]{4,10}|TGY\\d{5}-[A-Z0-9]{4,10})$", RegexOption.IGNORE_CASE)
             .matchEntire(normalizePart(raw))
         if (dnthBox != null)
             return ParseResult(true, dnthBox.groupValues[1].uppercase(), "DNTH_BOX", "dnth_i_prefix_removed", "2.1")
@@ -136,26 +136,43 @@ object TagParser {
 
     /** Confirmed DISC layouts: header, customer part, optional box part, quantity,
      * supplier C07, tag serial, optional lane, D/O, repeated customer part, 01.
-     * Field names are provisional; only the second pre-quantity part is selected
-     * for the new layout. The repeated customer part is checked independently.
+     * The unambiguous repeated Part No. immediately before 01 is parsed first.
+     * It then anchors the upper row, including layouts where the 7-digit quantity
+     * is printed directly after a variable-length Part No. without whitespace.
      */
     private fun dnthDisc(raw: String): ParseResult {
-        val part = "(?:T\\s*G\\s*Y(?:\\s*\\d){5}|T\\s*G(?:\\s*\\d){6})\\s*-(?:\\s*[A-Z0-9]){4}"
-        val layout = Regex(
-            "^DISC[0-9\\s]+($part)\\s+(?:($part)\\s+)?" +
-                "(\\d{7})\\s+C07\\s+\\d+\\s+(?:T-\\d+\\s+)?" +
-                "\\d+\\s*($part)\\s+01$"
-        ).matchEntire(raw)
-            ?: return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_fields", "3.0",
-                "รูปแบบ DISC ไม่ครบหรือไม่ตรงกับแบบที่รองรับ กรุณาตรวจ RAW DATA")
-        val customer = normalizePart(layout.groupValues[1])
-        val boxPart = normalizePart(layout.groupValues[2])
-        val repeatedCustomer = normalizePart(layout.groupValues[4])
-        if (customer != repeatedCustomer)
-            return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_fields", "3.0",
-                "รหัสอ้างอิง DNTH ต้นรายการและท้ายรายการไม่ตรงกัน")
-        return ParseResult(true, boxPart.ifEmpty { customer }, "KANBAN_DNTH",
-            if (boxPart.isEmpty()) "dnth_disc_legacy_part" else "dnth_disc_box_part_before_qty", "3.0")
+        val spacedPart = "(?:T\\s*G\\s*Y(?:\\s*\\d){5}|T\\s*G(?:\\s*\\d){6})\\s*-(?:\\s*[A-Z0-9]){4,10}"
+        val bottom = Regex("($spacedPart)\\s+01$").find(raw)
+            ?: return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.0",
+                "ไม่พบ Part No. แถวล่างก่อน 01")
+        val repeatedCustomer = normalizePart(bottom.groupValues[1])
+        val beforeBottom = raw.substring(0, bottom.range.first).trimEnd()
+        val c07Index = beforeBottom.lastIndexOf("C07")
+        if (c07Index < 0)
+            return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.0",
+                "ไม่พบช่อง C07 ใน KANBAN DNTH")
+
+        val upperCompact = normalizePart(beforeBottom.substring(0, c07Index))
+        val afterC07 = beforeBottom.substring(c07Index).trim()
+        if (!Regex("^C07\\s+\\d+\\s+(?:T-\\d+\\s+)?\\d+$").matches(afterC07))
+            return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.0",
+                "ช่องข้อมูลระหว่าง C07 และ Part No. แถวล่างไม่ครบ")
+
+        val anchoredUpper = Regex("^DISC\\d+${Regex.escape(repeatedCustomer)}(.*)$")
+            .matchEntire(upperCompact)
+            ?: return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.0",
+                "Part No. แถวบนไม่ตรงกับ Part No. แถวล่าง")
+        val remainder = anchoredUpper.groupValues[1]
+        val boxAndQuantity = Regex("^((?:TGY\\d{5}|TG\\d{6})-[A-Z0-9]{4,10})(\\d{7})$")
+            .matchEntire(remainder)
+        val boxPart = when {
+            Regex("^\\d{7}$").matches(remainder) -> ""
+            boxAndQuantity != null -> boxAndQuantity.groupValues[1]
+            else -> return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.0",
+                "แยก Part No. แถวบนและจำนวน 7 หลักไม่ได้")
+        }
+        return ParseResult(true, boxPart.ifEmpty { repeatedCustomer }, "KANBAN_DNTH",
+            if (boxPart.isEmpty()) "dnth_disc_bottom_part" else "dnth_disc_box_part_before_qty", "4.0")
     }
 
     fun firstDifference(expected: String, actual: String): String {

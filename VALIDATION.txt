@@ -29,3 +29,9 @@ NOT RUN HERE: Kotlin/Android compilation, full JUnit including CentralPayloadJso
 v0.18.1 compile hotfix:
 - exportAndShare now shows the AlertDialog then returns Unit explicitly; it no longer attempts to return AlertDialog from a Unit function.
 - CentralSession is now returned directly from Cursor.use; it is no longer assigned to an outer val inside a lambda.
+
+v0.18.2 DNTH parser update:
+- Bottom Part No. before 01 anchors DISC parsing.
+- Variable DNTH suffix length 4..10 supported for Kanban, Stand and Box.
+- Joined upper Part No. + seven-digit quantity supported.
+- Added tests for TG053661-7020S2, TG028993-6160 and conflicting upper/lower values.

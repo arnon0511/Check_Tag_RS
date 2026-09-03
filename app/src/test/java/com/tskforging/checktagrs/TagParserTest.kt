@@ -138,7 +138,7 @@ class TagParserTest {
         assertFalse(TagParser.kanban(discSample.replace("TG028993-590A", "BAD-PART")).success)
         assertFalse(TagParser.kanban(discSample.replace("0000040", "TG028993-591A 0000040")).success)
         assertFalse(TagParser.kanban(discSample.substringBefore("C07")).success)
-        assertFalse(TagParser.kanban(discSample.replace("TG028993-590A", "TG028993-590AA")).success)
+        assertFalse(TagParser.kanban(discSample.replace("TG028993-590A", "TG028993-590A_")).success)
     }
 
     @Test fun discAllowsBlankOptionalPartAndLaneInConfirmedStructure() {
@@ -173,10 +173,36 @@ class TagParserTest {
 
     @Test fun plainDnthDoesNotGuessFromOtherDocumentsOrMalformedValues() {
         for (raw in listOf("", " \u00a0", "| \u00a0", "EMPLOYEE|Mr.Burin", discSample,
-            "TG028993-590A TG028993-590B", "TG028993-590AA", "TG028993-590", "PREFIX TG028993-590A")) {
+            "TG028993-590A TG028993-590B", "TG028993-590A_", "TG028993-590", "PREFIX TG028993-590A")) {
             assertFalse("Stand accepted: $raw", TagParser.stand(raw).success)
             assertFalse("Box accepted: $raw", TagParser.box(raw).success)
         }
+    }
+
+    @Test fun discUsesBottomPartWhenLongSuffixAndQuantityAreJoined() {
+        val raw = "DISC5060020000010101000210125104151120710725124061290515207154081550911                         TG053661-7020S20000100                         C07        3036996                 T-1          60903373  TG053661-7020S2     01"
+        val result = TagParser.kanban(raw)
+
+        assertTrue(result.success)
+        assertEquals("TG053661-7020S2", result.partNo)
+        assertEquals("dnth_disc_bottom_part", result.ruleId)
+        assertEquals("4.0", result.ruleVersion)
+        assertTrue(TagParser.partsMatch(result.partNo!!, TagParser.stand("TG053661-7020S2").partNo!!))
+        assertTrue(TagParser.partsMatch(result.partNo!!, TagParser.box("ITG053661-7020S2").partNo!!))
+    }
+
+    @Test fun discBottomPartAlsoKeepsExistingFourCharacterSuffix() {
+        val raw = "DISC5060020000010101000210125104151120710725124061290515207154081550911                         TG028993-6160 0000020                         C07        3012062                              60903373  TG028993-6160       01"
+        val result = TagParser.kanban(raw)
+
+        assertTrue(result.success)
+        assertEquals("TG028993-6160", result.partNo)
+        assertEquals("dnth_disc_bottom_part", result.ruleId)
+    }
+
+    @Test fun discRejectsLongSuffixWhenUpperAndBottomPartsDiffer() {
+        val raw = "DISC5060020000010101000210125104151120710725124061290515207154081550911 TG053661-7020S20000100 C07 3036996 T-1 60903373 TG053661-7020S3 01"
+        assertFalse(TagParser.kanban(raw).success)
     }
 
     @Test fun plainDnthFixPreservesExistingStandBoxFormats() {

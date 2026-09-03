@@ -1,4 +1,4 @@
-# Check Tag_RS v0.18.1
+# Check Tag_RS v0.18.2
 
 Flow: พนักงาน → เลือกตรวจ/ข้าม Pick List → Pick List Aisin → KANBAN → กรอกจำนวนงานและจำนวน Box → Stand → Box ทุกกล่อง → BOX ครบ → Dashboard → ตรวจและส่ง Mail
 
@@ -31,7 +31,16 @@ v0.17.2:
 - เพิ่มแถบลำดับ `พนักงาน › Pick List › KANBAN › จำนวน › Stand › Box › Dashboard`
 - ทำเครื่องหมายขั้นที่ผ่านแล้ว ขั้นปัจจุบัน และบอกขั้นถัดไปเป็นข้อความชัดเจน
 
-versionCode 23 / versionName 0.18.1 / applicationId com.tskforging.checktagrs
+versionCode 24 / versionName 0.18.2 / applicationId com.tskforging.checktagrs
+
+## DNTH DISC long-suffix update (v0.18.2)
+
+- อ่าน Part No. แถวล่างก่อน `01` เป็นจุดอ้างอิงของโครงสร้าง KANBAN
+- รองรับ Part No. DNTH ที่ส่วนหลัง `-` ยาว 4–10 ตัว เช่น `TG053661-7020S2`
+- รองรับจำนวน 7 หลักที่พิมพ์ต่อชิด Part No. เช่น `TG053661-7020S20000100`
+- ตรวจว่า Part No. ด้านบนตรงกับรหัสแถวล่างก่อนยอมรับ
+- กรณี DISC สองรหัสแบบเดิม ยังเลือกรหัส Box ก่อนจำนวนตามกฎเดิม
+- Stand และ Box รองรับ Part No. DNTH suffix ยาวเหมือน KANBAN
 
 ## Central Dashboard / Google Sheets (v0.18)
 
