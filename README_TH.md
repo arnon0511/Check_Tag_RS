@@ -53,3 +53,13 @@ versionCode 24 / versionName 0.18.2 / applicationId com.tskforging.checktagrs
 - ถ้ายัง Sync ไม่สำเร็จ ผู้ใช้จะได้รับคำเตือนและเลือกว่าจะรอก่อนหรือเปิด Outlook ต่อ
 - Endpoint: `https://script.google.com/macros/s/AKfycbxS-jaE6QBM_JE3UbuNRk3ighMvtPsUTGyeleMYkM4oUAK0Kh05yS6EU7kDOtqUn_3Ziw/exec`
 ยังไม่ยืนยัน Android/Kotlin build หรือทดสอบบน PM75 จนกว่า GitHub Actions จะผ่าน
+# Check Tag_RS Android v0.19.0
+
+## Delivery Order QR preset
+
+- หลัง Scan KANBAN เลือก `Scan QR Delivery Order` หรือ `กรอกเอง`
+- QR รูปแบบ `CHECKTAGRS|DO|PART=...|QTY=...|BOX=...`
+- เติม Current QTY และ NO. OF BOX อัตโนมัติ
+- ตรวจ Part No. ใน QR กับ KANBAN ก่อนรับจำนวน
+- ไม่รับ QTY หรือ BOX ที่เป็นศูนย์
+- วิธีกรอกจำนวนแบบเดิมยังคงใช้งานได้

@@ -22,7 +22,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
-    private enum class Stage { EMPLOYEE, PICK_LIST, KANBAN, QUANTITY, STAND, BOX, DASHBOARD }
+    private enum class Stage { EMPLOYEE, PICK_LIST, KANBAN, QUANTITY, DELIVERY_ORDER, STAND, BOX, DASHBOARD }
     private lateinit var db:EvidenceDb; private lateinit var input:EditText; private lateinit var panel:LinearLayout
     private lateinit var stepView:TextView; private lateinit var instruction:TextView; private lateinit var status:TextView
     private lateinit var flowBar:TextView
@@ -56,7 +56,14 @@ class MainActivity : AppCompatActivity() {
                 pickRaw=raw;saveEvidence(ScanTarget.PICK_LIST,raw,"PICK_LIST_AISIN",null,"REFERENCE");stage=Stage.KANBAN;showNormal("รับ Pick List แล้ว");updateUi()}
             Stage.KANBAN->{val p=TagParser.kanban(raw);if(!p.success||p.partNo==null)return reject(ScanTarget.KANBAN,raw,p,"อ่าน KANBAN ไม่ได้")
                 if(comparePick){val m=AisinPickListMatcher.compare(pickRaw,raw);if(!m.success){pickMatch=m;return reject(ScanTarget.KANBAN,raw,p,"Pick List ไม่ตรง KANBAN\n${m.message}")};pickMatch=m}
-                kanbanRaw=raw;kanbanPart=p.partNo;saveEvidence(ScanTarget.KANBAN,raw,p.tagType,p.partNo,"MATCH");stage=Stage.QUANTITY;showQuantityDialog()}
+                kanbanRaw=raw;kanbanPart=p.partNo;saveEvidence(ScanTarget.KANBAN,raw,p.tagType,p.partNo,"MATCH");stage=Stage.QUANTITY;chooseQuantityMode()}
+            Stage.DELIVERY_ORDER->{val preset=DeliveryOrderQrParser.parse(raw)
+                if(preset==null)return showError("QR Delivery Order ไม่ถูกต้อง","ต้องมี Part No., Current QTY และ NO. OF BOX มากกว่า 0")
+                if(!TagParser.partsMatch(kanbanPart,preset.partNo))return showError("Delivery Order ไม่ตรง KANBAN","DO: ${preset.partNo}\nKANBAN: $kanbanPart")
+                workQty=preset.currentQty;expectedBoxes=preset.numberOfBoxes
+                db.saveInspectionDetails(sessionId,comparePick,pickRaw,pickMatch?.pickJcc,pickMatch?.kanbanJcc,workQty,expectedBoxes)
+                rawEvents+="#DO ${preset.partNo} | QTY=${preset.currentQty} | BOX=${preset.numberOfBoxes}"
+                pendingError=false;stage=Stage.STAND;showNormal("รับจำนวนจาก Delivery Order แล้ว");updateUi()}
             Stage.STAND->{val p=TagParser.stand(raw);if(!p.success||p.partNo==null)return reject(ScanTarget.STAND,raw,p,"อ่าน Stand ไม่ได้")
                 if(!TagParser.partsMatch(kanbanPart,p.partNo))return reject(ScanTarget.STAND,raw,p,"Stand ไม่ตรง KANBAN")
                 standPart=p.partNo;saveEvidence(ScanTarget.STAND,raw,p.tagType,p.partNo,"MATCH");pendingError=false;stage=Stage.BOX;showNormal("Stand ตรง — เริ่ม Scan Box");updateUi()}
@@ -69,6 +76,9 @@ class MainActivity : AppCompatActivity() {
     private fun choosePickMode(){AlertDialog.Builder(this).setTitle("เปรียบเทียบ Pick List กับ KANBAN?").setCancelable(false)
         .setPositiveButton("เปรียบเทียบ"){_,_->comparePick=true;stage=Stage.PICK_LIST;showNormal("รอ Scan Pick List Aisin");updateUi()}
         .setNegativeButton("ไม่เปรียบเทียบ"){_,_->comparePick=false;stage=Stage.KANBAN;showNormal("ข้าม Pick List — รอ Scan KANBAN");updateUi()}.show()}
+    private fun chooseQuantityMode(){AlertDialog.Builder(this).setTitle("รับจำนวนงานจากที่ใด?").setCancelable(false)
+        .setPositiveButton("Scan QR Delivery Order"){_,_->stage=Stage.DELIVERY_ORDER;showNormal("รอ Scan QR บน Delivery Order");updateUi();focusScanner()}
+        .setNegativeButton("กรอกเอง"){_,_->showQuantityDialog()}.show()}
     private fun showQuantityDialog(){stage=Stage.QUANTITY;val wrap=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(44,12,44,0)}
         val q=EditText(this).apply{hint="จำนวนงาน (PCS)";inputType=InputType.TYPE_CLASS_NUMBER};val b=EditText(this).apply{hint="จำนวน Box ที่ต้องส่ง";inputType=InputType.TYPE_CLASS_NUMBER};wrap.addView(q);wrap.addView(b)
         val d=AlertDialog.Builder(this).setTitle("กรอกจำนวนงาน").setView(wrap).setCancelable(false).setPositiveButton("บันทึก",null).create();d.setOnShowListener{d.getButton(-1).setOnClickListener{
@@ -93,13 +103,13 @@ class MainActivity : AppCompatActivity() {
         listOf(employeeView,kanbanView,standView,boxView,difference).forEach{it.setTextColor(Color.WHITE)};stepView.text="DASHBOARD";instruction.text="ขั้นถัดไป: ตรวจข้อมูลและส่ง Mail";updateFlowBar();boxDoneButton.visibility=View.GONE;clearButton.visibility=View.GONE;rescanButton.visibility=View.GONE;nextButton.visibility=View.VISIBLE;nextButton.text="เริ่มชุดใหม่";rawButton.visibility=View.VISIBLE;findViewById<Button>(R.id.exportButton).text="ตรวจและส่ง Mail"}
     private fun boxDifference()=when(BoxCountEvaluator.status(expectedBoxes,boxes.size)){BoxCountStatus.MATCH->"จำนวน Box ตรงกัน";BoxCountStatus.UNDER->"ขาด ${expectedBoxes-boxes.size} Box";BoxCountStatus.OVER->"เกิน ${boxes.size-expectedBoxes} Box"}
     private fun updateUi(){whitePanel();employeeView.text="ผู้ตรวจ: ${employeeName.ifBlank{"—"}}";kanbanView.text="KANBAN\n${kanbanPart.ifBlank{"—"}}";standView.text="STAND\n${standPart.ifBlank{"—"}}";boxView.text="BOX TAG\n${boxes.size} / ${if(expectedBoxes>0)expectedBoxes else "—"}";difference.text=if(expectedBoxes>0)boxDifference()else ""
-        stepView.text=when(stage){Stage.PICK_LIST->"SCAN PICK LIST";Stage.KANBAN->"SCAN KANBAN";Stage.STAND->"SCAN STAND";Stage.BOX->"SCAN BOX • ${boxes.size}";else->"CHECK TAG_RS"}
-        instruction.text=when(stage){Stage.PICK_LIST->"ตอนนี้: Scan Pick List Aisin • ถัดไป: KANBAN";Stage.KANBAN->"ตอนนี้: Scan KANBAN 1 ใบ • ถัดไป: กรอกจำนวน";Stage.STAND->"ตอนนี้: Scan Stand • ถัดไป: Box";Stage.BOX->"ตอนนี้: Scan Box ทุกกล่อง • ถัดไป: Dashboard";else->""};updateFlowBar();boxDoneButton.visibility=if(stage==Stage.BOX&&boxes.isNotEmpty())View.VISIBLE else View.GONE;clearButton.visibility=if(stage in listOf(Stage.PICK_LIST,Stage.KANBAN,Stage.STAND,Stage.BOX))View.VISIBLE else View.GONE;clearButton.isEnabled=stage==Stage.BOX&&boxes.isNotEmpty()||stage==Stage.STAND&&kanbanPart.isNotBlank()||stage==Stage.KANBAN&&pickRaw.isNotBlank();rawButton.visibility=if(rawEvents.isNotEmpty())View.VISIBLE else View.GONE;nextButton.visibility=View.GONE;rescanButton.visibility=View.GONE;resetBatchButton.visibility=if(stage==Stage.EMPLOYEE)View.GONE else View.VISIBLE}
+        stepView.text=when(stage){Stage.PICK_LIST->"SCAN PICK LIST";Stage.KANBAN->"SCAN KANBAN";Stage.DELIVERY_ORDER->"SCAN DELIVERY ORDER";Stage.STAND->"SCAN STAND";Stage.BOX->"SCAN BOX • ${boxes.size}";else->"CHECK TAG_RS"}
+        instruction.text=when(stage){Stage.PICK_LIST->"ตอนนี้: Scan Pick List Aisin • ถัดไป: KANBAN";Stage.KANBAN->"ตอนนี้: Scan KANBAN 1 ใบ • ถัดไป: รับจำนวน";Stage.DELIVERY_ORDER->"ตอนนี้: Scan QR Delivery Order • ถัดไป: Stand";Stage.STAND->"ตอนนี้: Scan Stand • ถัดไป: Box";Stage.BOX->"ตอนนี้: Scan Box ทุกกล่อง • ถัดไป: Dashboard";else->""};updateFlowBar();boxDoneButton.visibility=if(stage==Stage.BOX&&boxes.isNotEmpty())View.VISIBLE else View.GONE;clearButton.visibility=if(stage in listOf(Stage.PICK_LIST,Stage.KANBAN,Stage.DELIVERY_ORDER,Stage.STAND,Stage.BOX))View.VISIBLE else View.GONE;clearButton.isEnabled=stage==Stage.BOX&&boxes.isNotEmpty()||stage==Stage.STAND&&kanbanPart.isNotBlank()||stage==Stage.DELIVERY_ORDER||stage==Stage.KANBAN&&pickRaw.isNotBlank();rawButton.visibility=if(rawEvents.isNotEmpty())View.VISIBLE else View.GONE;nextButton.visibility=View.GONE;rescanButton.visibility=View.GONE;resetBatchButton.visibility=if(stage==Stage.EMPLOYEE)View.GONE else View.VISIBLE}
     private fun updateFlowBar(){
-        val names=listOf(Stage.EMPLOYEE to "พนักงาน",Stage.PICK_LIST to "Pick List",Stage.KANBAN to "KANBAN",Stage.QUANTITY to "จำนวน",Stage.STAND to "Stand",Stage.BOX to "Box",Stage.DASHBOARD to "Dashboard")
+        val names=listOf(Stage.EMPLOYEE to "พนักงาน",Stage.PICK_LIST to "Pick List",Stage.KANBAN to "KANBAN",Stage.DELIVERY_ORDER to "DO/จำนวน",Stage.STAND to "Stand",Stage.BOX to "Box",Stage.DASHBOARD to "Dashboard")
         val current=names.indexOfFirst{it.first==stage};flowBar.text=names.mapIndexed{i,p->when{stage==Stage.KANBAN&&!comparePick&&p.first==Stage.PICK_LIST->"ข้าม";i<current->"✓${p.second}";i==current->"[${p.second}]";else->p.second}}.joinToString("  ›  ")
     }
-    private fun clearLast(){when{stage==Stage.BOX&&boxes.isNotEmpty()->boxes.removeAt(boxes.lastIndex);stage==Stage.BOX->{standPart="";stage=Stage.STAND};stage==Stage.STAND->{kanbanPart="";kanbanRaw="";stage=Stage.KANBAN};stage==Stage.KANBAN&&comparePick->{pickRaw="";stage=Stage.PICK_LIST};else->return};pendingError=false;updateUi()}
+    private fun clearLast(){when{stage==Stage.BOX&&boxes.isNotEmpty()->boxes.removeAt(boxes.lastIndex);stage==Stage.BOX->{standPart="";stage=Stage.STAND};stage==Stage.STAND->{workQty=0;expectedBoxes=0;stage=Stage.QUANTITY;chooseQuantityMode();return};stage==Stage.DELIVERY_ORDER->{kanbanPart="";kanbanRaw="";stage=Stage.KANBAN};stage==Stage.KANBAN&&comparePick->{pickRaw="";stage=Stage.PICK_LIST};else->return};pendingError=false;updateUi()}
     private fun reject(t:ScanTarget,raw:String,p:ParseResult,title:String){retryCount++;pendingError=true;saveEvidence(t,raw,p.tagType,p.partNo,"MISMATCH");showError(title,p.message.ifBlank{"กรุณาตรวจและ Scan ใหม่"})}
     private fun saveEvidence(t:ScanTarget,raw:String,type:String,part:String?,compare:String){sequence++;db.saveEvent(ScanEvidence(UUID.randomUUID().toString(),sessionId,sequence,System.currentTimeMillis(),t,raw,sha256(raw),type,part,"v018_central_sync","1.0","SUCCESS",compare,null));rawEvents+="#$sequence ${t.name}\n$raw"}
     private fun showError(title:String,msg:String){status.text=title;status.setTextColor(Color.WHITE);panel.setBackgroundColor(Color.rgb(217,45,32));difference.text=msg;difference.setTextColor(Color.WHITE);rescanButton.visibility=View.VISIBLE;rawButton.visibility=View.VISIBLE;focusScanner()}
