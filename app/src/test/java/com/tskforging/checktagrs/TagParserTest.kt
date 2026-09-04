@@ -186,7 +186,7 @@ class TagParserTest {
         assertTrue(result.success)
         assertEquals("TG053661-7020S2", result.partNo)
         assertEquals("dnth_disc_bottom_part", result.ruleId)
-        assertEquals("4.0", result.ruleVersion)
+        assertEquals("4.1", result.ruleVersion)
         assertTrue(TagParser.partsMatch(result.partNo!!, TagParser.stand("TG053661-7020S2").partNo!!))
         assertTrue(TagParser.partsMatch(result.partNo!!, TagParser.box("ITG053661-7020S2").partNo!!))
     }
@@ -198,6 +198,16 @@ class TagParserTest {
         assertTrue(result.success)
         assertEquals("TG028993-6160", result.partNo)
         assertEquals("dnth_disc_bottom_part", result.ruleId)
+    }
+
+    @Test fun discAcceptsDnthLaneWithOrWithoutHyphenOrSpace() {
+        val base = "DISC5060020000010101000210125104151120710725124061290515207154081550911 TG028383-0090 0000030 C07 3901665 %s 60905059 TG028383-0090 01"
+        for (lane in listOf("T1", "T-1", "T 1")) {
+            val result = TagParser.kanban(base.format(lane))
+            assertTrue("Lane $lane was rejected: ${result.message}", result.success)
+            assertEquals("TG028383-0090", result.partNo)
+            assertEquals("4.1", result.ruleVersion)
+        }
     }
 
     @Test fun discRejectsLongSuffixWhenUpperAndBottomPartsDiffer() {

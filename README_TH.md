@@ -1,4 +1,4 @@
-# Check Tag_RS v0.18.2
+# Check Tag_RS v0.21.0
 
 Flow: พนักงาน → เลือกตรวจ/ข้าม Pick List → Pick List Aisin → KANBAN → กรอกจำนวนงานและจำนวน Box → Stand → Box ทุกกล่อง → BOX ครบ → Dashboard → ตรวจและส่ง Mail
 
@@ -63,3 +63,17 @@ versionCode 24 / versionName 0.18.2 / applicationId com.tskforging.checktagrs
 - ตรวจ Part No. ใน QR กับ KANBAN ก่อนรับจำนวน
 - ไม่รับ QTY หรือ BOX ที่เป็นศูนย์
 - วิธีกรอกจำนวนแบบเดิมยังคงใช้งานได้
+
+## DNTH Lane update (v0.20.0)
+
+- KANBAN แบบ DISC รองรับช่อง Lane ทั้ง `T1`, `T-1` และ `T 1`
+- ยังคงตรวจ Part No. แถวบนและแถวล่าง รวมทั้งโครงสร้าง C07 เหมือนเดิม
+- versionCode 26 / versionName 0.20.0
+
+## Mandatory scan workflow (v0.21.0)
+
+- ลำดับบังคับ: พนักงาน → Pick List Aisin → KANBAN → QR Delivery Order → Stand → Box → Dashboard
+- ยกเลิกหน้าต่างเลือกตรวจหรือข้าม Pick List
+- ยกเลิกการกรอกจำนวนงานและจำนวน Box ด้วยแป้นพิมพ์
+- จำนวนงานและจำนวน Box ต้องมาจาก QR Delivery Order เท่านั้น
+- versionCode 27 / versionName 0.21.0

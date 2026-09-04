@@ -143,24 +143,24 @@ object TagParser {
     private fun dnthDisc(raw: String): ParseResult {
         val spacedPart = "(?:T\\s*G\\s*Y(?:\\s*\\d){5}|T\\s*G(?:\\s*\\d){6})\\s*-(?:\\s*[A-Z0-9]){4,10}"
         val bottom = Regex("($spacedPart)\\s+01$").find(raw)
-            ?: return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.0",
+            ?: return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.1",
                 "ไม่พบ Part No. แถวล่างก่อน 01")
         val repeatedCustomer = normalizePart(bottom.groupValues[1])
         val beforeBottom = raw.substring(0, bottom.range.first).trimEnd()
         val c07Index = beforeBottom.lastIndexOf("C07")
         if (c07Index < 0)
-            return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.0",
+            return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.1",
                 "ไม่พบช่อง C07 ใน KANBAN DNTH")
 
         val upperCompact = normalizePart(beforeBottom.substring(0, c07Index))
         val afterC07 = beforeBottom.substring(c07Index).trim()
-        if (!Regex("^C07\\s+\\d+\\s+(?:T-\\d+\\s+)?\\d+$").matches(afterC07))
-            return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.0",
+        if (!Regex("^C07\\s+\\d+\\s+(?:T\\s*-?\\s*\\d+\\s+)?\\d+$").matches(afterC07))
+            return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.1",
                 "ช่องข้อมูลระหว่าง C07 และ Part No. แถวล่างไม่ครบ")
 
         val anchoredUpper = Regex("^DISC\\d+${Regex.escape(repeatedCustomer)}(.*)$")
             .matchEntire(upperCompact)
-            ?: return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.0",
+            ?: return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.1",
                 "Part No. แถวบนไม่ตรงกับ Part No. แถวล่าง")
         val remainder = anchoredUpper.groupValues[1]
         val boxAndQuantity = Regex("^((?:TGY\\d{5}|TG\\d{6})-[A-Z0-9]{4,10})(\\d{7})$")
@@ -168,11 +168,11 @@ object TagParser {
         val boxPart = when {
             Regex("^\\d{7}$").matches(remainder) -> ""
             boxAndQuantity != null -> boxAndQuantity.groupValues[1]
-            else -> return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.0",
+            else -> return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.1",
                 "แยก Part No. แถวบนและจำนวน 7 หลักไม่ได้")
         }
         return ParseResult(true, boxPart.ifEmpty { repeatedCustomer }, "KANBAN_DNTH",
-            if (boxPart.isEmpty()) "dnth_disc_bottom_part" else "dnth_disc_box_part_before_qty", "4.0")
+            if (boxPart.isEmpty()) "dnth_disc_bottom_part" else "dnth_disc_box_part_before_qty", "4.1")
     }
 
     fun firstDifference(expected: String, actual: String): String {
