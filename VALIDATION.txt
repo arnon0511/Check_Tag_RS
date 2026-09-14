@@ -44,3 +44,9 @@ v0.22.0 comparison and parser update:
 - DNTH DISC uses TG/TGY and the lower Part No. before 01; C07 and lane are not required anchors.
 - Added case-insensitive DNTH test without C07/lane and JTCS B01-attached sample test.
 - Local environment has no Gradle/Kotlin compiler; GitHub Actions must confirm JUnit and APK build.
+
+v0.22.2 optional Pick List update:
+- Employee scan opens a non-cancelable choice: compare Pick List or skip it.
+- Compare routes to PICK_LIST; skip routes directly to KANBAN.
+- The flow bar explicitly displays skipped Pick List state.
+- Delivery Order remains QR-only; manual quantity entry was not restored.

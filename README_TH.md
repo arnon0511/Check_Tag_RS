@@ -1,4 +1,13 @@
-# Check Tag_RS v0.22.1
+# Check Tag_RS v0.22.2
+
+## Optional Pick List comparison (v0.22.2)
+
+- หลัง Scan พนักงาน ให้เลือก `เปรียบเทียบ` หรือ `ไม่เปรียบเทียบ` Pick List กับ KANBAN
+- เลือกเปรียบเทียบ: Scan Pick List Aisin แล้วจึง Scan KANBAN
+- เลือกไม่เปรียบเทียบ: ข้ามไป Scan KANBAN ทันที
+- หน้าแถบขั้นตอนแสดง `ข้าม Pick List` อย่างชัดเจนเมื่อเลือกไม่ตรวจ
+- QR Delivery Order, Stand, Box, Dashboard และกฎ WARNING/MISMATCH ยังทำงานเหมือน v0.22.1
+- versionCode 30 / versionName 0.22.2
 
 ## Test hotfix (v0.22.1)
 
@@ -18,7 +27,7 @@
 - WARNING ถูกเก็บในประวัติ/RAW DATA และทำให้ผลสุดท้ายเป็น WARNING แม้จำนวน Box ตรง
 - versionCode 28 / versionName 0.22.0
 
-Flow: พนักงาน → เลือกตรวจ/ข้าม Pick List → Pick List Aisin → KANBAN → กรอกจำนวนงานและจำนวน Box → Stand → Box ทุกกล่อง → BOX ครบ → Dashboard → ตรวจและส่ง Mail
+Flow: พนักงาน → เลือกตรวจ/ข้าม Pick List → KANBAN → QR Delivery Order → Stand → Box ทุกกล่อง → BOX ครบ → Dashboard → ตรวจและส่ง Mail
 
 กฎ Aisin จากข้อมูลจริง:
 - JCC ใน KANBAN ต้องตรงกับด้านหน้าของ JCC ใน Pick List
