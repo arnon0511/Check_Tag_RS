@@ -50,3 +50,10 @@ v0.22.2 optional Pick List update:
 - Compare routes to PICK_LIST; skip routes directly to KANBAN.
 - The flow bar explicitly displays skipped Pick List state.
 - Delivery Order remains QR-only; manual quantity entry was not restored.
+
+v0.22.3 one-document flow correction:
+- Pick List and Delivery Order use the same generated QR and are scanned once.
+- Both compare and skip modes must scan the document QR to load QTY and BOX.
+- Document QR is scanned before KANBAN.
+- Compare mode checks document Part No. against KANBAN; skip mode does not.
+- KANBAN remains the reference for Stand and Box in both modes.

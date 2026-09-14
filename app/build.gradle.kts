@@ -10,8 +10,8 @@ android {
         applicationId = "com.tskforging.checktagrs"
         minSdk = 30
         targetSdk = 35
-        versionCode = 30
-        versionName = "0.22.2"
+        versionCode = 31
+        versionName = "0.22.3"
     }
 
     compileOptions {

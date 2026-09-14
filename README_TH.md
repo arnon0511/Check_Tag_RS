@@ -1,4 +1,14 @@
-# Check Tag_RS v0.22.2
+# Check Tag_RS v0.22.3
+
+## One document / one QR flow (v0.22.3)
+
+- Pick List และ Delivery Order เป็นเอกสารต้นทางเดียวกัน จึง Scan QR เพียงครั้งเดียว
+- หลัง Scan พนักงาน เลือกว่าจะเปรียบเทียบ Part No. ในเอกสารกับ KANBAN หรือไม่
+- ไม่ว่าจะเลือกแบบใด ต้อง Scan QR เพื่อรับ Part No., Current QTY และ NO. OF BOX เสมอ
+- เลือกเปรียบเทียบ: หลัง Scan KANBAN ระบบใช้กฎ EXACT/WARNING/MISMATCH เทียบกับ Part No. ใน QR
+- เลือกไม่เปรียบเทียบ: รับ KANBAN เป็นตัวอ้างอิงโดยไม่เทียบกับ Part No. ในเอกสาร
+- ทั้งสองทางยังใช้ KANBAN ตรวจ Stand และ Box ตามปกติ
+- versionCode 31 / versionName 0.22.3
 
 ## Optional Pick List comparison (v0.22.2)
 
@@ -27,7 +37,7 @@
 - WARNING ถูกเก็บในประวัติ/RAW DATA และทำให้ผลสุดท้ายเป็น WARNING แม้จำนวน Box ตรง
 - versionCode 28 / versionName 0.22.0
 
-Flow: พนักงาน → เลือกตรวจ/ข้าม Pick List → KANBAN → QR Delivery Order → Stand → Box ทุกกล่อง → BOX ครบ → Dashboard → ตรวจและส่ง Mail
+Flow: พนักงาน → เลือกเปรียบเทียบ/ไม่เปรียบเทียบ → QR Pick List/Delivery Order → KANBAN → Stand → Box ทุกกล่อง → BOX ครบ → Dashboard → ตรวจและส่ง Mail
 
 กฎ Aisin จากข้อมูลจริง:
 - JCC ใน KANBAN ต้องตรงกับด้านหน้าของ JCC ใน Pick List
