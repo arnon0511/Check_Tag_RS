@@ -1,14 +1,17 @@
-# Check Tag_RS v0.22.4
+# Check Tag_RS v0.22.5
 
-## Quantity-first optional comparison flow (v0.22.4)
+## Optional document and Stand comparison flow (v0.22.5)
 
 - หลัง Scan พนักงาน เลือกว่าจะเปรียบเทียบ Pick List/Delivery Order กับ KANBAN หรือไม่
 - ไม่ว่าจะเลือกแบบใด ต้องกรอก Current QTY และ NO. OF BOX มากกว่า 0 ก่อนเสมอ
 - เลือกเปรียบเทียบ: กรอกจำนวน -> Scan Pick List/Delivery Order -> Scan KANBAN
 - เลือกไม่เปรียบเทียบ: กรอกจำนวน -> Scan KANBAN โดยข้ามเอกสาร
 - QR เอกสารไม่เขียนทับจำนวนงานและจำนวน Box ที่ผู้ใช้ยืนยันแล้ว
+- หลังรับ KANBAN ให้เลือกตรวจ Stand หรือไม่ตรวจ Stand
+- ตรวจ Stand: Scan Stand แล้วเปรียบเทียบกับ KANBAN ก่อน Scan Box
+- ไม่ตรวจ Stand: ข้ามไป Scan Box และเปรียบเทียบ Box กับ KANBAN โดยตรง
 - ทั้งสองทางยังใช้ KANBAN ตรวจ Stand และ Box ตามปกติ
-- versionCode 32 / versionName 0.22.4
+- versionCode 33 / versionName 0.22.5
 
 ## Optional Pick List comparison (v0.22.2)
 

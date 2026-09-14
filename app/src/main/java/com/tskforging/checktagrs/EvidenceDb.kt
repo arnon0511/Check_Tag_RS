@@ -51,10 +51,15 @@ class EvidenceDb(context: Context) : SQLiteOpenHelper(context, "check_tag_rs.db"
     }
 
     fun startSession(id: String, checkStand: Boolean, employeeName: String, employeeRaw: String) = writableDatabase.insertOrThrow("sessions", null, ContentValues().apply {
-        put("session_id", id); put("started_at", System.currentTimeMillis()); put("app_version", "0.18.2")
+        put("session_id", id); put("started_at", System.currentTimeMillis()); put("app_version", "0.22.5")
         put("stand_check_mode", if(checkStand) "CHECK" else "SKIP")
         put("employee_name", employeeName); put("employee_raw", employeeRaw)
     })
+
+    fun updateStandCheckMode(id:String, checkStand:Boolean) =
+        writableDatabase.update("sessions", ContentValues().apply {
+            put("stand_check_mode", if(checkStand) "CHECK" else "SKIP")
+        },"session_id=?",arrayOf(id))
 
     fun saveInspectionDetails(id:String, comparePick:Boolean, pickRaw:String, pickJcc:String?, kanbanJcc:String?, workQty:Int, expectedBoxes:Int) =
         writableDatabase.update("sessions", ContentValues().apply {

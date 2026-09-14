@@ -63,3 +63,9 @@ v0.22.4 quantity-first optional comparison correction:
 - Compare mode: quantity/boxes -> Pick List/Delivery Order QR -> KANBAN.
 - Skip mode: quantity/boxes -> KANBAN; document QR is skipped.
 - Document QR no longer overwrites the manually confirmed quantity or box count.
+
+v0.22.5 optional Stand correction:
+- After KANBAN is accepted, operator must choose whether to inspect Stand.
+- Check Stand routes to STAND and compares it with KANBAN.
+- Skip Stand routes directly to BOX; Box is compared with KANBAN only.
+- The progress bar omits Stand when Stand inspection is skipped.
