@@ -1,14 +1,14 @@
-# Check Tag_RS v0.22.3
+# Check Tag_RS v0.22.4
 
-## One document / one QR flow (v0.22.3)
+## Quantity-first optional comparison flow (v0.22.4)
 
-- Pick List และ Delivery Order เป็นเอกสารต้นทางเดียวกัน จึง Scan QR เพียงครั้งเดียว
-- หลัง Scan พนักงาน เลือกว่าจะเปรียบเทียบ Part No. ในเอกสารกับ KANBAN หรือไม่
-- ไม่ว่าจะเลือกแบบใด ต้อง Scan QR เพื่อรับ Part No., Current QTY และ NO. OF BOX เสมอ
-- เลือกเปรียบเทียบ: หลัง Scan KANBAN ระบบใช้กฎ EXACT/WARNING/MISMATCH เทียบกับ Part No. ใน QR
-- เลือกไม่เปรียบเทียบ: รับ KANBAN เป็นตัวอ้างอิงโดยไม่เทียบกับ Part No. ในเอกสาร
+- หลัง Scan พนักงาน เลือกว่าจะเปรียบเทียบ Pick List/Delivery Order กับ KANBAN หรือไม่
+- ไม่ว่าจะเลือกแบบใด ต้องกรอก Current QTY และ NO. OF BOX มากกว่า 0 ก่อนเสมอ
+- เลือกเปรียบเทียบ: กรอกจำนวน -> Scan Pick List/Delivery Order -> Scan KANBAN
+- เลือกไม่เปรียบเทียบ: กรอกจำนวน -> Scan KANBAN โดยข้ามเอกสาร
+- QR เอกสารไม่เขียนทับจำนวนงานและจำนวน Box ที่ผู้ใช้ยืนยันแล้ว
 - ทั้งสองทางยังใช้ KANBAN ตรวจ Stand และ Box ตามปกติ
-- versionCode 31 / versionName 0.22.3
+- versionCode 32 / versionName 0.22.4
 
 ## Optional Pick List comparison (v0.22.2)
 

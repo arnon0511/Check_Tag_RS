@@ -57,3 +57,9 @@ v0.22.3 one-document flow correction:
 - Document QR is scanned before KANBAN.
 - Compare mode checks document Part No. against KANBAN; skip mode does not.
 - KANBAN remains the reference for Stand and Box in both modes.
+
+v0.22.4 quantity-first optional comparison correction:
+- Both modes require manual Current QTY and NO. OF BOX greater than zero first.
+- Compare mode: quantity/boxes -> Pick List/Delivery Order QR -> KANBAN.
+- Skip mode: quantity/boxes -> KANBAN; document QR is skipped.
+- Document QR no longer overwrites the manually confirmed quantity or box count.
