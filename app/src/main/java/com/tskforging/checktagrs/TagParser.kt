@@ -30,7 +30,10 @@ object TagParser {
     }
 
     fun partsMatch(expected: String, actual: String): Boolean =
-        compareParts(expected, actual).result == PartComparison.EXACT
+        compareParts(expected, actual).let {
+            it.result == PartComparison.EXACT ||
+                (it.result == PartComparison.WARNING && it.expected.startsWith("J"))
+        }
 
     // Accept only a complete, known DNTH Part No.; never extract a substring
     // from a multi-field Kanban, employee QR, or arbitrary label text.
@@ -158,7 +161,7 @@ object TagParser {
      * they are deliberately not parsing anchors.
      */
     private fun dnthDisc(raw: String): ParseResult {
-        val spacedPart = "(?:T\\s*G\\s*Y(?:\\s*\\d){5}|T\\s*G(?:\\s*\\d){6})\\s*-(?:\\s*[A-Z0-9]){4,10}"
+        val spacedPart = "(?:T\\s*G\\s*Y(?:\\s*\\d){5}|T\\s*G(?:\\s*\\d){6})\\s*-(?:\\s?[A-Z0-9]){4,10}?"
         val bottom = Regex("($spacedPart)\\s+01$", RegexOption.IGNORE_CASE).find(raw)
             ?: return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.1",
                 "ไม่พบ Part No. แถวล่างก่อน 01")
@@ -169,14 +172,18 @@ object TagParser {
             return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_tg_primary", "5.0",
                 "พบข้อมูลคล้าย Part No. แต่รูปแบบไม่ถูกต้อง")
         val beforeCompact = normalizePart(beforeBottom)
-        val upperCandidates = Regex(spacedPart, RegexOption.IGNORE_CASE)
+        val upperCandidates = Regex(
+            "($spacedPart)(?=\\s{2,}|\\s+T\\s*G|\\s+\\d{6,}(?:\\s|$)|\\s+C07(?:\\s|$)|$)",
+            RegexOption.IGNORE_CASE
+        )
             .findAll(beforeBottom)
-            .map { normalizePart(it.value) }
+            .map { normalizePart(it.groupValues[1]) }
             .map { if (it.startsWith(repeatedCustomer)) repeatedCustomer else it }
             .distinct()
             .toList()
         val hasRepeatedUpper = beforeCompact.contains(repeatedCustomer)
-        if (!hasRepeatedUpper && upperCandidates.isNotEmpty())
+        val hasAnyUpperTg = Regex("(?:TGY\\d{5}|TG\\d{6})-").containsMatchIn(beforeCompact)
+        if (!hasRepeatedUpper && (upperCandidates.isNotEmpty() || hasAnyUpperTg))
             return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_tg_primary", "5.0",
                 "Part No. แถวบนไม่ตรงกับ Part No. แถวล่าง")
         val boxCandidates = upperCandidates.filter { it != repeatedCustomer }

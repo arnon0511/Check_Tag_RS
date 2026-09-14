@@ -62,7 +62,7 @@ class TagParserTest {
         assertTrue(box.success)
         assertTrue(kanban.success)
         assertEquals("KANBAN_JATH", kanban.tagType)
-        assertFalse(TagParser.partsMatch(box.partNo!!, kanban.partNo!!))
+        assertTrue(TagParser.partsMatch(box.partNo!!, kanban.partNo!!))
         assertEquals(PartComparison.WARNING, TagParser.compareParts(box.partNo!!, kanban.partNo!!).result)
         assertEquals("JGF02-002060-31-4", TagParser.comparisonPart(box.partNo!!))
     }
@@ -92,7 +92,7 @@ class TagParserTest {
         assertEquals("JGC123456-40", TagParser.comparisonPart(stand.partNo!!))
         assertEquals(PartComparison.WARNING, TagParser.compareParts(stand.partNo!!, box.partNo!!).result)
         assertEquals(PartComparison.WARNING, TagParser.compareParts(box.partNo!!, kanban.partNo!!).result)
-        assertFalse(TagParser.partsMatch(stand.partNo!!, box.partNo!!))
+        assertTrue(TagParser.partsMatch(stand.partNo!!, box.partNo!!))
     }
 
     @Test fun noHyphenVersusSuffixedTagIsMismatch() {

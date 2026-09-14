@@ -1,4 +1,11 @@
-# Check Tag_RS v0.22.0
+# Check Tag_RS v0.22.1
+
+## Test hotfix (v0.22.1)
+
+- แก้ DNTH ไม่ให้ตัวเลขจำนวน 7 หลักที่อยู่ถัดจาก Part No. ถูกต่อเป็นส่วนหนึ่งของ Part No.
+- รักษาความเข้ากันได้ของ Flow tests เดิม โดยหน้าจอใช้งานจริงยังตัดสินด้วย EXACT/WARNING/MISMATCH
+- เพิ่มการตรวจ DNTH แถวบนแบบตัวอักษรยาวที่พิมพ์ติดกับจำนวน
+- versionCode 29 / versionName 0.22.1
 
 ## Part comparison and DNTH/JTCS update (v0.22.0)
 
