@@ -35,6 +35,7 @@ class MainActivity : AppCompatActivity() {
     private var pickMatch:AisinDocumentMatch?=null; private var kanbanRaw=""; private var kanbanPart=""
     private var standPart=""; private var workQty=0; private var expectedBoxes=0; private val boxes=mutableListOf<String>()
     private var pendingError=false; private var overrideReason=""; private val rawEvents=mutableListOf<String>()
+    private val approvedWarnings=mutableSetOf<String>()
 
     override fun onCreate(savedInstanceState:Bundle?){ super.onCreate(savedInstanceState);setContentView(R.layout.activity_main)
         db=EvidenceDb(this);input=findViewById(R.id.scannerInput);panel=findViewById(R.id.resultPanel);stepView=findViewById(R.id.step)
@@ -59,25 +60,26 @@ class MainActivity : AppCompatActivity() {
                 kanbanRaw=raw;kanbanPart=p.partNo;saveEvidence(ScanTarget.KANBAN,raw,p.tagType,p.partNo,"MATCH");stage=Stage.DELIVERY_ORDER;showNormal("KANBAN ตรง — รอ Scan QR Delivery Order");updateUi()}
             Stage.DELIVERY_ORDER->{val preset=DeliveryOrderQrParser.parse(raw)
                 if(preset==null)return showError("QR Delivery Order ไม่ถูกต้อง","ต้องมี Part No., Current QTY และ NO. OF BOX มากกว่า 0")
-                if(!TagParser.partsMatch(kanbanPart,preset.partNo))return showError("Delivery Order ไม่ตรง KANBAN","DO: ${preset.partNo}\nKANBAN: $kanbanPart")
-                workQty=preset.currentQty;expectedBoxes=preset.numberOfBoxes
-                db.saveInspectionDetails(sessionId,comparePick,pickRaw,pickMatch?.pickJcc,pickMatch?.kanbanJcc,workQty,expectedBoxes)
-                rawEvents+="#DO ${preset.partNo} | QTY=${preset.currentQty} | BOX=${preset.numberOfBoxes}"
-                pendingError=false;stage=Stage.STAND;showNormal("รับจำนวนจาก Delivery Order แล้ว");updateUi()}
+                acceptCompared(ScanTarget.DELIVERY_ORDER,raw,"DELIVERY_ORDER_QR",preset.partNo,
+                    listOf("KANBAN" to kanbanPart),"Delivery Order"){
+                    workQty=preset.currentQty;expectedBoxes=preset.numberOfBoxes
+                    db.saveInspectionDetails(sessionId,comparePick,pickRaw,pickMatch?.pickJcc,pickMatch?.kanbanJcc,workQty,expectedBoxes)
+                    stage=Stage.STAND;showNormal("รับจำนวนจาก Delivery Order แล้ว");updateUi()}}
             Stage.STAND->{val p=TagParser.stand(raw);if(!p.success||p.partNo==null)return reject(ScanTarget.STAND,raw,p,"อ่าน Stand ไม่ได้")
-                if(!TagParser.partsMatch(kanbanPart,p.partNo))return reject(ScanTarget.STAND,raw,p,"Stand ไม่ตรง KANBAN")
-                standPart=p.partNo;saveEvidence(ScanTarget.STAND,raw,p.tagType,p.partNo,"MATCH");pendingError=false;stage=Stage.BOX;showNormal("Stand ตรง — เริ่ม Scan Box");updateUi()}
+                acceptCompared(ScanTarget.STAND,raw,p.tagType,p.partNo,listOf("KANBAN" to kanbanPart),"Stand"){
+                    standPart=p.partNo;stage=Stage.BOX;showNormal("รับ Stand แล้ว — เริ่ม Scan Box");updateUi()}}
             Stage.BOX->{val p=TagParser.box(raw);if(!p.success||p.partNo==null)return reject(ScanTarget.BOX_TAG,raw,p,"อ่าน Tag Box ไม่ได้")
-                if(!TagParser.partsMatch(kanbanPart,p.partNo)||!TagParser.partsMatch(standPart,p.partNo))return reject(ScanTarget.BOX_TAG,raw,p,"Box ไม่ตรงกับ KANBAN/Stand")
-                boxes+=p.partNo;saveEvidence(ScanTarget.BOX_TAG,raw,p.tagType,p.partNo,"MATCH");pendingError=false;showNormal("BOX #${boxes.size} ผ่าน");updateUi();if(expectedBoxes>0&&BoxCountEvaluator.status(expectedBoxes,boxes.size)==BoxCountStatus.OVER)showOverCountWarning()}
+                acceptCompared(ScanTarget.BOX_TAG,raw,p.tagType,p.partNo,
+                    listOf("KANBAN" to kanbanPart,"STAND" to standPart),"Box"){
+                    boxes+=p.partNo;showNormal("BOX #${boxes.size} รับแล้ว");updateUi();if(expectedBoxes>0&&BoxCountEvaluator.status(expectedBoxes,boxes.size)==BoxCountStatus.OVER)showOverCountWarning()}}
             else->Unit
         };focusScanner()
     }
     private fun finishBoxes(){if(stage!=Stage.BOX||boxes.isEmpty()||pendingError)return Toast.makeText(this,"ต้องมี Box ผ่านและแก้รายการผิดก่อน",Toast.LENGTH_SHORT).show()
-        if(boxes.size==expectedBoxes)return complete("OK","")
+        if(boxes.size==expectedBoxes)return complete(if(overrideReason.isBlank())"OK" else "WARNING",overrideReason)
         val edit=EditText(this).apply{hint="เหตุผลที่ยืนยันส่ง";inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE}
         val d=AlertDialog.Builder(this).setTitle("จำนวน Box ไม่ตรง").setMessage("กำหนด $expectedBoxes Box / Scan ${boxes.size} Box\n${boxDifference()}").setView(edit).setNegativeButton("กลับไป Scan เพิ่ม",null).setPositiveButton("ยืนยันส่ง",null).create()
-        d.setOnShowListener{d.getButton(-1).setOnClickListener{if(edit.text.toString().isBlank())Toast.makeText(this,"ต้องกรอกเหตุผล",Toast.LENGTH_SHORT).show()else{overrideReason=edit.text.toString();d.dismiss();complete("WARNING",overrideReason)}}};d.show()}
+        d.setOnShowListener{d.getButton(-1).setOnClickListener{if(edit.text.toString().isBlank())Toast.makeText(this,"ต้องกรอกเหตุผล",Toast.LENGTH_SHORT).show()else{val countReason="จำนวน Box ไม่ตรง: ${edit.text.toString().trim()}";overrideReason=if(overrideReason.isBlank())countReason else "$overrideReason\n$countReason";d.dismiss();complete("WARNING",overrideReason)}}};d.show()}
     private fun showOverCountWarning(){
         AlertDialog.Builder(this).setTitle("⚠ Scan Box เกินจำนวน")
             .setMessage("กำหนด $expectedBoxes Box แต่ Scan แล้ว ${boxes.size} Box\nเกิน ${boxes.size-expectedBoxes} Box\n\nหากยิงซ้ำให้ลบ Box ล่าสุด หากต้องส่งเกินให้เก็บไว้และกด BOX ครบเพื่อระบุเหตุผล")
@@ -101,11 +103,43 @@ class MainActivity : AppCompatActivity() {
     }
     private fun clearLast(){when{stage==Stage.BOX&&boxes.isNotEmpty()->boxes.removeAt(boxes.lastIndex);stage==Stage.BOX->{standPart="";stage=Stage.STAND};stage==Stage.STAND->{workQty=0;expectedBoxes=0;stage=Stage.DELIVERY_ORDER};stage==Stage.DELIVERY_ORDER->{kanbanPart="";kanbanRaw="";stage=Stage.KANBAN};stage==Stage.KANBAN->{pickRaw="";pickMatch=null;stage=Stage.PICK_LIST};else->return};pendingError=false;updateUi()}
     private fun reject(t:ScanTarget,raw:String,p:ParseResult,title:String){retryCount++;pendingError=true;saveEvidence(t,raw,p.tagType,p.partNo,"MISMATCH");showError(title,p.message.ifBlank{"กรุณาตรวจและ Scan ใหม่"})}
-    private fun saveEvidence(t:ScanTarget,raw:String,type:String,part:String?,compare:String){sequence++;db.saveEvent(ScanEvidence(UUID.randomUUID().toString(),sessionId,sequence,System.currentTimeMillis(),t,raw,sha256(raw),type,part,"v018_central_sync","1.0","SUCCESS",compare,null));rawEvents+="#$sequence ${t.name}\n$raw"}
+    private fun acceptCompared(t:ScanTarget,raw:String,type:String,part:String,checks:List<Pair<String,String>>,label:String,onAccepted:()->Unit){
+        val compared=checks.map{(name,expected)->name to TagParser.compareParts(expected,part)}
+        val mismatches=compared.filter{it.second.result==PartComparison.MISMATCH}
+        if(mismatches.isNotEmpty()){
+            retryCount++;pendingError=true;saveEvidence(t,raw,type,part,"MISMATCH")
+            return showError("$label ไม่ตรง",mismatches.joinToString("\n\n"){"เทียบกับ ${it.first}:\n${it.second.message}\n${it.second.expected} ≠ ${it.second.actual}"})
+        }
+        val warnings=compared.filter{it.second.result==PartComparison.WARNING}
+        if(warnings.isEmpty()){
+            saveEvidence(t,raw,type,part,"MATCH");pendingError=false;onAccepted();return
+        }
+        fun warningKey(result:PartComparisonResult)=listOf(result.expected,result.actual).sorted().joinToString("|")
+        val newWarnings=warnings.filter{warningKey(it.second)!in approvedWarnings}
+        if(newWarnings.isEmpty()){
+            saveEvidence(t,raw,type,part,"WARNING");pendingError=false;onAccepted();return
+        }
+        pendingError=true
+        val details=newWarnings.joinToString("\n\n"){"เทียบกับ ${it.first}:\n${it.second.message}\n${it.second.expected} ≠ ${it.second.actual}"}
+        val edit=EditText(this).apply{hint="เหตุผลที่ยืนยันทำต่อ";inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE}
+        val dialog=AlertDialog.Builder(this).setTitle("⚠ $label Part No. ใกล้เคียงแต่ไม่ตรง")
+            .setMessage("$details\n\nกรุณาตรวจ Tag จริง หากต้องทำต่อให้ระบุเหตุผล")
+            .setView(edit).setNegativeButton("สแกนใหม่",null).setPositiveButton("ยืนยันทำต่อ",null).create()
+        dialog.setOnShowListener{dialog.getButton(-1).setOnClickListener{
+            val reason=edit.text.toString().trim()
+            if(reason.isBlank())Toast.makeText(this,"ต้องกรอกเหตุผล",Toast.LENGTH_SHORT).show() else {
+                val record="$label: $details | เหตุผล: $reason"
+                overrideReason=if(overrideReason.isBlank())record else "$overrideReason\n$record"
+                newWarnings.forEach{approvedWarnings+=warningKey(it.second)}
+                saveEvidence(t,raw,type,part,"WARNING");pendingError=false;dialog.dismiss();onAccepted()
+            }
+        }};dialog.show()
+    }
+    private fun saveEvidence(t:ScanTarget,raw:String,type:String,part:String?,compare:String){sequence++;db.saveEvent(ScanEvidence(UUID.randomUUID().toString(),sessionId,sequence,System.currentTimeMillis(),t,raw,sha256(raw),type,part,"v022_three_level_compare","1.0","SUCCESS",compare,null));rawEvents+="#$sequence ${t.name}\n$raw"}
     private fun showError(title:String,msg:String){status.text=title;status.setTextColor(Color.WHITE);panel.setBackgroundColor(Color.rgb(217,45,32));difference.text=msg;difference.setTextColor(Color.WHITE);rescanButton.visibility=View.VISIBLE;rawButton.visibility=View.VISIBLE;focusScanner()}
     private fun showNormal(text:String){whitePanel();status.text=text;status.setTextColor(Color.rgb(6,118,71));difference.text=""}
     private fun confirmReset(){AlertDialog.Builder(this).setTitle("ล้างชุดปัจจุบัน?").setMessage("ข้อมูลชุดนี้จะถูกยกเลิก แต่ RAW DATA ยังอยู่").setNegativeButton("ยกเลิก",null).setPositiveButton("ล้างชุด"){_,_->if(sessionId.isNotEmpty())db.cancelSession(sessionId);resetAll()}.show()}
-    private fun resetAll(){stage=Stage.EMPLOYEE;sessionId="";sequence=0;retryCount=0;employeeName="";employeeRaw="";comparePick=true;pickRaw="";pickMatch=null;kanbanRaw="";kanbanPart="";standPart="";workQty=0;expectedBoxes=0;boxes.clear();pendingError=false;overrideReason="";rawEvents.clear();whitePanel();status.text="รอ Scan พนักงาน";stepView.text="SCAN EMPLOYEE";instruction.text="ตอนนี้: Scan QR พนักงาน • ถัดไป: Scan Pick List";updateFlowBar();employeeView.text="ผู้ตรวจ: —";standView.text="STAND\n—";kanbanView.text="KANBAN\n—";boxView.text="BOX TAG\n0";difference.text="";listOf(rawButton,boxDoneButton,resetBatchButton,rescanButton,nextButton,clearButton).forEach{it.visibility=View.GONE};clearButton.isEnabled=false;focusScanner()}
+    private fun resetAll(){stage=Stage.EMPLOYEE;sessionId="";sequence=0;retryCount=0;employeeName="";employeeRaw="";comparePick=true;pickRaw="";pickMatch=null;kanbanRaw="";kanbanPart="";standPart="";workQty=0;expectedBoxes=0;boxes.clear();pendingError=false;overrideReason="";approvedWarnings.clear();rawEvents.clear();whitePanel();status.text="รอ Scan พนักงาน";stepView.text="SCAN EMPLOYEE";instruction.text="ตอนนี้: Scan QR พนักงาน • ถัดไป: Scan Pick List";updateFlowBar();employeeView.text="ผู้ตรวจ: —";standView.text="STAND\n—";kanbanView.text="KANBAN\n—";boxView.text="BOX TAG\n0";difference.text="";listOf(rawButton,boxDoneButton,resetBatchButton,rescanButton,nextButton,clearButton).forEach{it.visibility=View.GONE};clearButton.isEnabled=false;focusScanner()}
     private fun showRaw()=AlertDialog.Builder(this).setTitle("RAW DATA").setMessage(rawEvents.joinToString("\n\n").ifBlank{"—"}).setPositiveButton("ปิด",null).show()
     private fun showHistory(){val items=db.history();if(items.isEmpty())return;val labels=items.map{"${Date(it.startedAt)} ${it.result}\n${it.employeeName} • ${it.partNo}"}.toTypedArray();AlertDialog.Builder(this).setTitle("ประวัติ").setItems(labels){_,i->AlertDialog.Builder(this).setTitle("รายละเอียด").setMessage(db.historyDetail(items[i].sessionId)).setPositiveButton("ปิด",null).show()}.setNegativeButton("ปิด",null).show()}
     private fun exportAndShare(){

@@ -55,15 +55,16 @@ class TagParserTest {
         assertEquals("KANBAN_DNTH", kanban.tagType)
     }
 
-    @Test fun jathBoxVariantMatchesKanbanBasePart() {
+    @Test fun jathBoxVariantIsWarningInsteadOfSilentMatch() {
         val box = TagParser.box("PD26080501|FP0001|PART|JGF02-002060-31-4")
         val kanban = TagParser.kanban("JGF02-002060-31")
 
         assertTrue(box.success)
         assertTrue(kanban.success)
         assertEquals("KANBAN_JATH", kanban.tagType)
-        assertTrue(TagParser.partsMatch(box.partNo!!, kanban.partNo!!))
-        assertEquals("JGF02", TagParser.comparisonPart(box.partNo!!))
+        assertFalse(TagParser.partsMatch(box.partNo!!, kanban.partNo!!))
+        assertEquals(PartComparison.WARNING, TagParser.compareParts(box.partNo!!, kanban.partNo!!).result)
+        assertEquals("JGF02-002060-31-4", TagParser.comparisonPart(box.partNo!!))
     }
 
     @Test fun jathWithoutBoxVariantAlsoMatches() {
@@ -80,7 +81,7 @@ class TagParserTest {
         assertFalse(TagParser.partsMatch("TG028351-5130", "TG028351"))
     }
 
-    @Test fun jtektIgnoresEverythingAfterFirstHyphenForAllTagTypes() {
+    @Test fun jtektDifferentSuffixesRequireWarningForAllTagTypes() {
         val stand = TagParser.stand("|JGC123456-40")
         val box = TagParser.box("PD26080501|FP0001|PART|JGC123456-31-2")
         val kanban = TagParser.kanban("KANBAN JGC123456-99")
@@ -88,15 +89,14 @@ class TagParserTest {
         assertTrue(stand.success)
         assertTrue(box.success)
         assertTrue(kanban.success)
-        assertEquals("JGC123456", TagParser.comparisonPart(stand.partNo!!))
-        assertEquals("JGC123456", TagParser.comparisonPart(box.partNo!!))
-        assertEquals("JGC123456", TagParser.comparisonPart(kanban.partNo!!))
-        assertTrue(TagParser.partsMatch(stand.partNo!!, box.partNo!!))
-        assertTrue(TagParser.partsMatch(box.partNo!!, kanban.partNo!!))
+        assertEquals("JGC123456-40", TagParser.comparisonPart(stand.partNo!!))
+        assertEquals(PartComparison.WARNING, TagParser.compareParts(stand.partNo!!, box.partNo!!).result)
+        assertEquals(PartComparison.WARNING, TagParser.compareParts(box.partNo!!, kanban.partNo!!).result)
+        assertFalse(TagParser.partsMatch(stand.partNo!!, box.partNo!!))
     }
 
-    @Test fun jtektWithoutHyphenStillMatchesSuffixedTag() {
-        assertTrue(TagParser.partsMatch("JGC123456", "JGC123456-40"))
+    @Test fun noHyphenVersusSuffixedTagIsMismatch() {
+        assertEquals(PartComparison.MISMATCH, TagParser.compareParts("JGC123456", "JGC123456-40").result)
     }
 
     @Test fun rejectsUnknownKanbanInsteadOfGuessing() {
@@ -113,11 +113,11 @@ class TagParserTest {
         val result = TagParser.kanban(discSample)
         assertTrue(result.success)
         assertEquals("TG028993-590A", result.partNo)
-        assertEquals("dnth_disc_box_part_before_qty", result.ruleId)
+        assertEquals("dnth_disc_box_tg_primary", result.ruleId)
         assertTrue(TagParser.partsMatch(TagParser.stand("|TG028993-590 A").partNo!!, result.partNo!!))
         assertTrue(TagParser.partsMatch(TagParser.box("|TG028993-590 A").partNo!!, result.partNo!!))
         assertFalse(TagParser.partsMatch("TG028382-502C", result.partNo!!))
-        assertFalse(TagParser.partsMatch("TG028993-590B", result.partNo!!))
+        assertEquals(PartComparison.WARNING, TagParser.compareParts("TG028993-590B", result.partNo!!).result)
     }
 
     @Test fun discHandlesUnicodePaddingAndWhitespaceInsidePart() {
@@ -133,11 +133,11 @@ class TagParserTest {
         assertFalse(TagParser.kanban(raw).success)
     }
 
-    @Test fun discRejectsMissingQuantityMissingPartAndExtraCandidate() {
-        assertFalse(TagParser.kanban(discSample.replace("0000040", "")).success)
+    @Test fun discAllowsMissingMetadataButRejectsMissingPartAndExtraCandidate() {
+        assertTrue(TagParser.kanban(discSample.replace("0000040", "")).success)
+        assertTrue(TagParser.kanban(discSample.replace("C07        3001660                 T-5          6082501901", "")).success)
         assertFalse(TagParser.kanban(discSample.replace("TG028993-590A", "BAD-PART")).success)
         assertFalse(TagParser.kanban(discSample.replace("0000040", "TG028993-591A 0000040")).success)
-        assertFalse(TagParser.kanban(discSample.substringBefore("C07")).success)
         assertFalse(TagParser.kanban(discSample.replace("TG028993-590A", "TG028993-590A_")).success)
     }
 
@@ -148,8 +148,8 @@ class TagParserTest {
 
     @Test fun legacyDnthStillRejectsDifferentSuffixes() {
         assertFalse(TagParser.kanban("TG028351-5130 data TG028351-5131").success)
-        assertTrue(TagParser.partsMatch("JGC123456-40", "JGC123456-31-2"))
-        assertFalse(TagParser.partsMatch("TG028382-502C", "TG028382-503C"))
+        assertEquals(PartComparison.WARNING, TagParser.compareParts("JGC123456-40", "JGC123456-31-2").result)
+        assertEquals(PartComparison.WARNING, TagParser.compareParts("TG028382-502C", "TG028382-503C").result)
     }
     @Test fun readsPlainDnthStandAndBoxWithAsciiAndUnicodeSpaces() {
         for (raw in listOf("TG028993-590 A", " TG028993-590\u00a0A\r\n", "tg028993-590a", "TG028993-590\u202fA")) {
@@ -168,7 +168,7 @@ class TagParserTest {
         val kanban = TagParser.kanban(discSample)
         assertTrue(TagParser.partsMatch(stand.partNo!!, box.partNo!!))
         assertTrue(TagParser.partsMatch(box.partNo!!, kanban.partNo!!))
-        assertFalse(TagParser.partsMatch(TagParser.box("TG028993-590B").partNo!!, kanban.partNo!!))
+        assertEquals(PartComparison.WARNING, TagParser.compareParts(TagParser.box("TG028993-590B").partNo!!, kanban.partNo!!).result)
     }
 
     @Test fun plainDnthDoesNotGuessFromOtherDocumentsOrMalformedValues() {
@@ -185,8 +185,8 @@ class TagParserTest {
 
         assertTrue(result.success)
         assertEquals("TG053661-7020S2", result.partNo)
-        assertEquals("dnth_disc_bottom_part", result.ruleId)
-        assertEquals("4.1", result.ruleVersion)
+        assertEquals("dnth_disc_bottom_tg_primary", result.ruleId)
+        assertEquals("5.0", result.ruleVersion)
         assertTrue(TagParser.partsMatch(result.partNo!!, TagParser.stand("TG053661-7020S2").partNo!!))
         assertTrue(TagParser.partsMatch(result.partNo!!, TagParser.box("ITG053661-7020S2").partNo!!))
     }
@@ -197,7 +197,7 @@ class TagParserTest {
 
         assertTrue(result.success)
         assertEquals("TG028993-6160", result.partNo)
-        assertEquals("dnth_disc_bottom_part", result.ruleId)
+        assertEquals("dnth_disc_bottom_tg_primary", result.ruleId)
     }
 
     @Test fun discAcceptsDnthLaneWithOrWithoutHyphenOrSpace() {
@@ -206,7 +206,7 @@ class TagParserTest {
             val result = TagParser.kanban(base.format(lane))
             assertTrue("Lane $lane was rejected: ${result.message}", result.success)
             assertEquals("TG028383-0090", result.partNo)
-            assertEquals("4.1", result.ruleVersion)
+            assertEquals("5.0", result.ruleVersion)
         }
     }
 
@@ -221,5 +221,27 @@ class TagParserTest {
         assertEquals("TG028993-590A", TagParser.box("ITG028993-590 A").partNo)
         assertEquals("TG028993-590A", TagParser.box("PD26080101|FP01|PART|TG028993-590 A|40|PCS").partNo)
         assertEquals("JGC123456-40", TagParser.stand("|JGC123456-40").partNo)
+    }
+
+    @Test fun discUsesTgCaseInsensitivelyWithoutDependingOnLaneOrC07() {
+        val raw = "DISC506002000001 tg028383-0040 0000030 3007010 60910340 tg028383-0040 01"
+        val result = TagParser.kanban(raw)
+        assertTrue(result.message, result.success)
+        assertEquals("TG028383-0040", result.partNo)
+        assertEquals("dnth_disc_bottom_tg_primary", result.ruleId)
+    }
+
+    @Test fun jtcsB01AttachedPartIsParsedAndComparedInThreeLevels() {
+        val raw = "B01JGD10-0001230-400000010021130202774 5211302 0038338z"
+        val kanban = TagParser.kanban(raw)
+        assertTrue(kanban.message, kanban.success)
+        assertEquals("JGD10-0001230-40", kanban.partNo)
+        assertEquals("KANBAN_JTCS", kanban.tagType)
+        assertEquals(PartComparison.WARNING,
+            TagParser.compareParts(kanban.partNo!!, "JGD10-001230-40-0").result)
+        assertEquals(PartComparison.MISMATCH,
+            TagParser.compareParts(kanban.partNo!!, "JGF02-001230-40-0").result)
+        assertEquals(PartComparison.EXACT,
+            TagParser.compareParts("jgd10-001230-40", "JGD10-001230-40").result)
     }
 }

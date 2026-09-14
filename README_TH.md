@@ -1,4 +1,15 @@
-# Check Tag_RS v0.21.0
+# Check Tag_RS v0.22.0
+
+## Part comparison and DNTH/JTCS update (v0.22.0)
+
+- เปรียบเทียบ Part No. เต็มหลังตัดช่องว่างและปรับตัวพิมพ์ใหญ่/เล็ก
+- รหัสเต็มตรงกันเป็น `OK`
+- รหัสก่อนขีดแรกตรง แต่รายละเอียดหลังขีดต่างเป็น `WARNING` และต้องกรอกเหตุผลเพื่อทำต่อ
+- รหัสก่อนขีดแรกต่างเป็น `MISMATCH` และต้องสแกนใหม่
+- DNTH DISC ยึดรหัส `TG/TGY` แถวล่างก่อน `01` เป็นหลัก โดยไม่อิง `C07`, `T1`, `T-1`, `T 1` หรือจำนวนช่องว่าง
+- รองรับ KANBAN JTCS ที่ `B01` ติดกับ Part No. เช่น `B01JGD10-0001230-40...`
+- WARNING ถูกเก็บในประวัติ/RAW DATA และทำให้ผลสุดท้ายเป็น WARNING แม้จำนวน Box ตรง
+- versionCode 28 / versionName 0.22.0
 
 Flow: พนักงาน → เลือกตรวจ/ข้าม Pick List → Pick List Aisin → KANBAN → กรอกจำนวนงานและจำนวน Box → Stand → Box ทุกกล่อง → BOX ครบ → Dashboard → ตรวจและส่ง Mail
 
@@ -77,3 +88,4 @@ versionCode 24 / versionName 0.18.2 / applicationId com.tskforging.checktagrs
 - ยกเลิกการกรอกจำนวนงานและจำนวน Box ด้วยแป้นพิมพ์
 - จำนวนงานและจำนวน Box ต้องมาจาก QR Delivery Order เท่านั้น
 - versionCode 27 / versionName 0.21.0
+- Hotfix: คืน `InputType` import สำหรับช่องกรอกเหตุผลเมื่อจำนวน Box ไม่ตรง

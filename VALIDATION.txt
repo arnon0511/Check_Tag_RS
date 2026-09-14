@@ -35,3 +35,12 @@ v0.18.2 DNTH parser update:
 - Variable DNTH suffix length 4..10 supported for Kanban, Stand and Box.
 - Joined upper Part No. + seven-digit quantity supported.
 - Added tests for TG053661-7020S2, TG028993-6160 and conflicting upper/lower values.
+
+v0.22.0 comparison and parser update:
+- Added EXACT / WARNING / MISMATCH comparison levels for every customer Part No.
+- Same family before the first hyphen but different remaining characters is WARNING, never silent OK.
+- Different family before the first hyphen is MISMATCH and cannot advance.
+- WARNING requires a reason once per Part No. pair and remains WARNING on Dashboard/CSV.
+- DNTH DISC uses TG/TGY and the lower Part No. before 01; C07 and lane are not required anchors.
+- Added case-insensitive DNTH test without C07/lane and JTCS B01-attached sample test.
+- Local environment has no Gradle/Kotlin compiler; GitHub Actions must confirm JUnit and APK build.

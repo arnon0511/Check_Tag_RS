@@ -8,20 +8,29 @@ object TagParser {
         .filterNot { it.isWhitespace() || Character.isSpaceChar(it) }
         .uppercase()
 
-    /**
-     * Returns the value used only for comparison. For JTEKT/JATH Part Nos.,
-     * every character from the first '-' onward is a label-specific suffix
-     * and must be ignored across Stand, Box and Kanban tags.
-     */
-    fun comparisonPart(value: String): String {
-        val normalized = normalizePart(value)
-        val isJtekt = Regex("^J[A-Z]{2}(?:\\d{6}|\\d{2}-\\d{6}-\\d{2})(?:-[A-Z0-9]+)*$")
-            .matches(normalized)
-        return if (isJtekt) normalized.substringBefore('-') else normalized
+    /** Full normalized value. Customer suffixes are no longer silently ignored. */
+    fun comparisonPart(value: String): String = normalizePart(value)
+
+    fun compareParts(expected: String, actual: String): PartComparisonResult {
+        val e = comparisonPart(expected)
+        val a = comparisonPart(actual)
+        if (e == a) return PartComparisonResult(
+            PartComparison.EXACT, e, a, "Part No. ตรงกันทุกตัวอักษร"
+        )
+        val eFamily = e.substringBefore('-')
+        val aFamily = a.substringBefore('-')
+        val sameFamily = '-' in e && '-' in a && eFamily == aFamily
+        return if (sameFamily) PartComparisonResult(
+            PartComparison.WARNING, e, a,
+            "กลุ่ม $eFamily ตรงกัน แต่รายละเอียดหลังเครื่องหมาย - ต่างกัน\n${firstDifference(e, a)}"
+        ) else PartComparisonResult(
+            PartComparison.MISMATCH, e, a,
+            "กลุ่ม Part No. ไม่ตรงกัน: $eFamily ≠ $aFamily"
+        )
     }
 
     fun partsMatch(expected: String, actual: String): Boolean =
-        comparisonPart(expected) == comparisonPart(actual)
+        compareParts(expected, actual).result == PartComparison.EXACT
 
     // Accept only a complete, known DNTH Part No.; never extract a substring
     // from a multi-field Kanban, employee QR, or arbitrary label text.
@@ -109,11 +118,20 @@ object TagParser {
         if (dnthMatches.isNotEmpty())
             return ParseResult(false, null, "KANBAN_DNTH", "dnth_repeated_part", "2.1", "Part No. DNTH ต้องพบซ้ำอย่างน้อย 2 ตำแหน่งและต้องตรงกัน")
 
-        // JTEKT/JATH comparison ignores everything from the first '-' onward,
-        // regardless of whether the suffix is printed on Stand, Box or Kanban.
+        // JTCS legacy Kanban can join B01 directly to the Part No. and can
+        // print seven digits in its first numeric section.
+        val jtcs = Regex(
+            "B01\\s*(J[A-Z]{2}\\d{2}-\\d{6,7}-[A-Z0-9]{2})",
+            RegexOption.IGNORE_CASE
+        ).find(raw)
+        if (jtcs != null)
+            return ParseResult(true, normalizePart(jtcs.groupValues[1]), "KANBAN_JTCS", "jtcs_b01_part", "1.0")
+
+        // JTEKT/JATH parsing keeps the full Part No. Comparison later decides
+        // whether it is an exact match, same-family warning, or mismatch.
         val jathMatches = Regex("(?<![A-Z0-9])(J[A-Z]{2}(?:\\d{6}(?:-[A-Z0-9]+)*|\\d{2}-\\d{6}-\\d{2}(?:-[A-Z0-9]+)*))(?![A-Z0-9-])")
             .findAll(raw.uppercase())
-            .map { comparisonPart(it.value) }
+            .map { normalizePart(it.value) }
             .distinct()
             .toList()
         if (jathMatches.size == 1)
@@ -134,45 +152,40 @@ object TagParser {
         return ParseResult(false, null, "UNKNOWN", "kanban_customer_auto", "1.0", "ยังไม่มีกติกาสำหรับ Kanban รูปแบบนี้")
     }
 
-    /** Confirmed DISC layouts: header, customer part, optional box part, quantity,
-     * supplier C07, tag serial, optional lane, D/O, repeated customer part, 01.
-     * The unambiguous repeated Part No. immediately before 01 is parsed first.
-     * It then anchors the upper row, including layouts where the 7-digit quantity
-     * is printed directly after a variable-length Part No. without whitespace.
+    /**
+     * DNTH DISC uses the TG/TGY value immediately before the final 01 as its
+     * lower-row reference. C07, lane text and whitespace are optional metadata;
+     * they are deliberately not parsing anchors.
      */
     private fun dnthDisc(raw: String): ParseResult {
         val spacedPart = "(?:T\\s*G\\s*Y(?:\\s*\\d){5}|T\\s*G(?:\\s*\\d){6})\\s*-(?:\\s*[A-Z0-9]){4,10}"
-        val bottom = Regex("($spacedPart)\\s+01$").find(raw)
+        val bottom = Regex("($spacedPart)\\s+01$", RegexOption.IGNORE_CASE).find(raw)
             ?: return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.1",
                 "ไม่พบ Part No. แถวล่างก่อน 01")
         val repeatedCustomer = normalizePart(bottom.groupValues[1])
         val beforeBottom = raw.substring(0, bottom.range.first).trimEnd()
-        val c07Index = beforeBottom.lastIndexOf("C07")
-        if (c07Index < 0)
-            return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.1",
-                "ไม่พบช่อง C07 ใน KANBAN DNTH")
-
-        val upperCompact = normalizePart(beforeBottom.substring(0, c07Index))
-        val afterC07 = beforeBottom.substring(c07Index).trim()
-        if (!Regex("^C07\\s+\\d+\\s+(?:T\\s*-?\\s*\\d+\\s+)?\\d+$").matches(afterC07))
-            return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.1",
-                "ช่องข้อมูลระหว่าง C07 และ Part No. แถวล่างไม่ครบ")
-
-        val anchoredUpper = Regex("^DISC\\d+${Regex.escape(repeatedCustomer)}(.*)$")
-            .matchEntire(upperCompact)
-            ?: return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.1",
+        if (Regex("(?:T\\s*G\\s*Y(?:\\s*\\d){5}|T\\s*G(?:\\s*\\d){6})\\s*-(?:\\s*[A-Z0-9]){4,10}_", RegexOption.IGNORE_CASE).containsMatchIn(beforeBottom)
+                || Regex("(?<![A-Z0-9])[A-Z]{2,}\\s*-\\s*[A-Z]{2,}(?![A-Z0-9])", RegexOption.IGNORE_CASE).containsMatchIn(beforeBottom))
+            return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_tg_primary", "5.0",
+                "พบข้อมูลคล้าย Part No. แต่รูปแบบไม่ถูกต้อง")
+        val beforeCompact = normalizePart(beforeBottom)
+        val upperCandidates = Regex(spacedPart, RegexOption.IGNORE_CASE)
+            .findAll(beforeBottom)
+            .map { normalizePart(it.value) }
+            .map { if (it.startsWith(repeatedCustomer)) repeatedCustomer else it }
+            .distinct()
+            .toList()
+        val hasRepeatedUpper = beforeCompact.contains(repeatedCustomer)
+        if (!hasRepeatedUpper && upperCandidates.isNotEmpty())
+            return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_tg_primary", "5.0",
                 "Part No. แถวบนไม่ตรงกับ Part No. แถวล่าง")
-        val remainder = anchoredUpper.groupValues[1]
-        val boxAndQuantity = Regex("^((?:TGY\\d{5}|TG\\d{6})-[A-Z0-9]{4,10})(\\d{7})$")
-            .matchEntire(remainder)
-        val boxPart = when {
-            Regex("^\\d{7}$").matches(remainder) -> ""
-            boxAndQuantity != null -> boxAndQuantity.groupValues[1]
-            else -> return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_bottom_part", "4.1",
-                "แยก Part No. แถวบนและจำนวน 7 หลักไม่ได้")
-        }
-        return ParseResult(true, boxPart.ifEmpty { repeatedCustomer }, "KANBAN_DNTH",
-            if (boxPart.isEmpty()) "dnth_disc_bottom_part" else "dnth_disc_box_part_before_qty", "4.1")
+        val boxCandidates = upperCandidates.filter { it != repeatedCustomer }
+        if (boxCandidates.size > 1)
+            return ParseResult(false, null, "KANBAN_DNTH", "dnth_disc_tg_primary", "5.0",
+                "พบ Part No. แถวบนมากกว่า 1 ค่าที่ไม่ตรงกัน")
+        val selected = boxCandidates.singleOrNull() ?: repeatedCustomer
+        return ParseResult(true, selected, "KANBAN_DNTH",
+            if (selected == repeatedCustomer) "dnth_disc_bottom_tg_primary" else "dnth_disc_box_tg_primary", "5.0")
     }
 
     fun firstDifference(expected: String, actual: String): String {

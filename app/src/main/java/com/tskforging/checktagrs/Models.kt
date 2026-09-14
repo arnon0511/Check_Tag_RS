@@ -1,8 +1,17 @@
 package com.tskforging.checktagrs
 
-enum class ScanTarget { PICK_LIST, STAND, BOX_TAG, KANBAN }
+enum class ScanTarget { PICK_LIST, DELIVERY_ORDER, STAND, BOX_TAG, KANBAN }
 
 data class ParseResult(val success: Boolean, val partNo: String?, val tagType: String, val ruleId: String, val ruleVersion: String, val message: String = "")
+
+enum class PartComparison { EXACT, WARNING, MISMATCH }
+
+data class PartComparisonResult(
+    val result: PartComparison,
+    val expected: String,
+    val actual: String,
+    val message: String
+)
 
 data class ScanEvidence(
     val eventId: String, val sessionId: String, val sequence: Int, val scannedAt: Long,
