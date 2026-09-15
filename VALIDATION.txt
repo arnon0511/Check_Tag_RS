@@ -74,3 +74,4 @@ v0.22.6 position-prefix and warning UI correction:
 - Treat one-letter/two-digit leading location codes such as B01 and C01 as metadata, not Part No.
 - Attached forms such as C01JGC10-003770-40 are parsed as JGC10-003770-40, case-insensitively.
 - Part No. WARNING confirmation dialog uses a light orange background.
+- GitHub Actions uses setup-android v4 with an empty packages input so it does not request the removed legacy `tools` package; required SDK 35 packages are installed explicitly afterward.
