@@ -1,6 +1,6 @@
-# Check Tag_RS v0.22.5
+# Check Tag_RS v0.22.6
 
-## Optional document and Stand comparison flow (v0.22.5)
+## Position-prefix parsing and warning color (v0.22.6)
 
 - หลัง Scan พนักงาน เลือกว่าจะเปรียบเทียบ Pick List/Delivery Order กับ KANBAN หรือไม่
 - ไม่ว่าจะเลือกแบบใด ต้องกรอก Current QTY และ NO. OF BOX มากกว่า 0 ก่อนเสมอ
@@ -10,8 +10,11 @@
 - หลังรับ KANBAN ให้เลือกตรวจ Stand หรือไม่ตรวจ Stand
 - ตรวจ Stand: Scan Stand แล้วเปรียบเทียบกับ KANBAN ก่อน Scan Box
 - ไม่ตรวจ Stand: ข้ามไป Scan Box และเปรียบเทียบ Box กับ KANBAN โดยตรง
+- รหัสประเภท/ตำแหน่งด้านหน้ารูปแบบตัวอักษร 1 ตัว + ตัวเลข 2 ตัว เช่น B01/C01 ไม่ถือเป็น Part No.
+- รองรับรหัสประเภท/ตำแหน่งที่พิมพ์ติดกับ J-series Part No. โดยไม่สนใจตัวพิมพ์เล็ก/ใหญ่
+- หน้าต่างยืนยัน Part No. ใกล้เคียงแต่ไม่ตรงใช้พื้นสีส้มอ่อน
 - ทั้งสองทางยังใช้ KANBAN ตรวจ Stand และ Box ตามปกติ
-- versionCode 33 / versionName 0.22.5
+- versionCode 34 / versionName 0.22.6
 
 ## Optional Pick List comparison (v0.22.2)
 

@@ -160,7 +160,9 @@ class MainActivity : AppCompatActivity() {
         val dialog=AlertDialog.Builder(this).setTitle("⚠ $label Part No. ใกล้เคียงแต่ไม่ตรง")
             .setMessage("$details\n\nกรุณาตรวจ Tag จริง หากต้องทำต่อให้ระบุเหตุผล")
             .setView(edit).setNegativeButton("สแกนใหม่",null).setPositiveButton("ยืนยันทำต่อ",null).create()
-        dialog.setOnShowListener{dialog.getButton(-1).setOnClickListener{
+        dialog.setOnShowListener{
+            dialog.window?.decorView?.setBackgroundColor(Color.rgb(255,243,224))
+            dialog.getButton(-1).setOnClickListener{
             val reason=edit.text.toString().trim()
             if(reason.isBlank())Toast.makeText(this,"ต้องกรอกเหตุผล",Toast.LENGTH_SHORT).show() else {
                 val record="$label: $details | เหตุผล: $reason"

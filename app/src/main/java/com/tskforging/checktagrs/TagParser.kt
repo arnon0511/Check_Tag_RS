@@ -121,14 +121,14 @@ object TagParser {
         if (dnthMatches.isNotEmpty())
             return ParseResult(false, null, "KANBAN_DNTH", "dnth_repeated_part", "2.1", "Part No. DNTH ต้องพบซ้ำอย่างน้อย 2 ตำแหน่งและต้องตรงกัน")
 
-        // JTCS legacy Kanban can join B01 directly to the Part No. and can
-        // print seven digits in its first numeric section.
-        val jtcs = Regex(
-            "B01\\s*(J[A-Z]{2}\\d{2}-\\d{6,7}-[A-Z0-9]{2})",
+        // A leading location/type code such as B01 or C01 is not part of the
+        // Part No. It may be printed directly against the J-series Part No.
+        val positionedJPart = Regex(
+            "(?<![A-Z0-9])[A-Z]\\d{2}\\s*(J[A-Z]{2}\\d{2}-\\d{6,7}-[A-Z0-9]{2})",
             RegexOption.IGNORE_CASE
         ).find(raw)
-        if (jtcs != null)
-            return ParseResult(true, normalizePart(jtcs.groupValues[1]), "KANBAN_JTCS", "jtcs_b01_part", "1.0")
+        if (positionedJPart != null)
+            return ParseResult(true, normalizePart(positionedJPart.groupValues[1]), "KANBAN_JTCS", "position_prefix_j_part", "1.1")
 
         // JTEKT/JATH parsing keeps the full Part No. Comparison later decides
         // whether it is an exact match, same-family warning, or mismatch.

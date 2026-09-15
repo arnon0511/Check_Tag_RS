@@ -244,4 +244,13 @@ class TagParserTest {
         assertEquals(PartComparison.EXACT,
             TagParser.compareParts("jgd10-001230-40", "JGD10-001230-40").result)
     }
+
+    @Test fun locationPrefixAttachedToJPartIsNotPartOfPartNumber() {
+        listOf("B01", "C01", "c01").forEach { prefix ->
+            val result = TagParser.kanban("${prefix}JGC10-003770-400000020021049802782")
+            assertTrue(result.message, result.success)
+            assertEquals("JGC10-003770-40", result.partNo)
+            assertEquals("position_prefix_j_part", result.ruleId)
+        }
+    }
 }
